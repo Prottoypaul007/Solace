@@ -1,0 +1,5 @@
+{
+  "name": "TutorTrack Mobile",
+  "description": "A mobile-first application for home tutors to manage students, track classes, calculate salaries, and view session history using local storage.",
+  "requestFramePermissions": []
+}
