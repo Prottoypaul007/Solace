@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Download, FileUp, ShieldCheck } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { Button } from '../components/Button';
-import { AppBackup, backupCounts, createBackup, missingStudentReferences, parseBackup, restoreBackup } from '../services/backup';
+import { AppBackup, backupCounts, createBackup, missingStudentReferences, parseBackup, recoverMissingStudents, restoreBackup } from '../services/backup';
 import { saveBackupFile } from '../services/backupShare';
 import { useNavigate } from 'react-router-dom';
 import { hasPendingChanges, recordChanged, repairImportedRecords, retrySync } from '../services/sync';
@@ -71,10 +71,13 @@ export const BackupSettings: React.FC = () => {
     setBusy(true);
     setError('');
     try {
-      restoreBackup(selected);
+      const prepared = recoverMissingStudents(selected);
+      restoreBackup(prepared);
       recordChanged();
       setSelected(null);
-      setNotice('Backup restored. Your students and records are ready to use.');
+      setNotice(prepared.data.students.length > selected.data.students.length
+        ? 'Backup restored. Imported records for missing students are kept and will link automatically when you add an exact matching student name.'
+        : 'Backup restored. Your students and records are ready to use.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not restore this backup.');
     } finally {
@@ -126,6 +129,7 @@ export const BackupSettings: React.FC = () => {
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-200">
                 {backupCounts(selected).map(({ collection, count }) => <p key={collection}>{labels[collection]}: {count}</p>)}
               </div>
+              {missingStudentReferences(selected).length > 0 && <p className="mt-3 text-xs leading-5 text-amber-200">This file has records for {missingStudentReferences(selected).length} students absent from its student list. Solace will keep them as imported records until you add a student with a unique exact name match.</p>}
               <p className="mt-3 text-xs leading-5 text-amber-200">Restoring replaces all current records. Save a backup of this device first if you want to keep them.</p>
               <Button className="mt-3" variant="danger" fullWidth disabled={busy} onClick={restore}>Replace current data</Button>
             </div>

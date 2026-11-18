@@ -69,6 +69,7 @@ test('recovers missing student references without changing linked records', () =
   assert.equal(repaired.data.students.length, original.data.students.length + 1);
   assert.equal(repaired.data.students.at(-1).id, 'missing-1');
   assert.equal(repaired.data.students.at(-1).ratePerClass, 0);
+  assert.equal(repaired.data.students.at(-1).recovered, true);
   assert.deepEqual(repaired.data.testResults, [result]);
   assert.equal(original.data.students.some(item => item.id === 'missing-1'), false);
   assert.equal(recoverMissingStudents(repaired), repaired);

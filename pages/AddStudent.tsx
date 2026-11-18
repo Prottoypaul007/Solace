@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
-import { addStudent } from '../services/storage';
+import { addStudent, getRecoveredMatches } from '../services/storage';
 import { v4 as uuidv4 } from 'uuid';
 
 export const AddStudent: React.FC = () => {
@@ -20,6 +20,7 @@ export const AddStudent: React.FC = () => {
     rate: '',
   });
   const [saveError, setSaveError] = useState('');
+  const recoveredMatches = getRecoveredMatches(formData.name);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -42,7 +43,7 @@ export const AddStudent: React.FC = () => {
     if (newErrors.name || newErrors.subject || newErrors.rate) return;
 
     try {
-      addStudent({
+      const saved = addStudent({
         id: uuidv4(),
         name: formData.name.trim(),
         subject: formData.subject.trim(),
@@ -50,7 +51,7 @@ export const AddStudent: React.FC = () => {
         phone: formData.phone.trim(),
         createdAt: new Date().toISOString(),
       });
-      navigate('/students');
+      navigate(saved.merged ? `/student/${saved.student.id}` : '/students');
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Could not save student.');
     }
@@ -67,6 +68,8 @@ export const AddStudent: React.FC = () => {
             onChange={(e) => handleChange(e, 'name')}
             placeholder="e.g. Rafi Hasan"
           />
+          {recoveredMatches.length === 1 && <p role="status" className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">Imported records for this name will be linked automatically when you save.</p>}
+          {recoveredMatches.length > 1 && <p role="status" className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">More than one imported record matches this name. Saving will create a separate student so records are not linked incorrectly.</p>}
           <Input
             label="Subject"
             value={formData.subject}

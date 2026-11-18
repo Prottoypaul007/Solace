@@ -5,6 +5,7 @@ export interface Student {
   ratePerClass: number;
   phone: string;
   createdAt: string;
+  recovered?: boolean;
 }
 
 export interface ClassSession {

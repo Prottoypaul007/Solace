@@ -4,18 +4,20 @@ import { ArrowRight, BookOpen, MessageCircle, Plus, Users, Wallet } from 'lucide
 import { Layout } from '../components/Layout';
 import { getClasses, getPayments, getStudentBalance, getStudents, sortStudentsByRecentClass } from '../services/storage';
 import { getUnsentTestResults } from '../services/communication';
+import { isRecoveredStudent } from '../services/recoveredStudents';
 
 const money = (amount: number) => `৳${amount.toLocaleString('en-BD')}`;
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const students = getStudents();
+  const students = getStudents().filter(student => !isRecoveredStudent(student));
   const classes = getClasses();
   const payments = getPayments();
   const recent = sortStudentsByRecentClass(students, classes).slice(0, 3);
   const received = payments.reduce((sum, item) => sum + item.amount, 0);
   const due = students.reduce((sum, item) => sum + Math.max(0, getStudentBalance(item.id)), 0);
-  const unsent = getUnsentTestResults().length;
+  const activeIds = new Set(students.map(student => student.id));
+  const unsent = getUnsentTestResults().filter(result => activeIds.has(result.studentId)).length;
   const stats = [
     { label: 'Students', value: students.length.toLocaleString(), icon: Users, tone: 'text-blue-300 bg-blue-500/15' },
     { label: 'Classes logged', value: classes.length.toLocaleString(), icon: BookOpen, tone: 'text-violet-300 bg-violet-500/15' },

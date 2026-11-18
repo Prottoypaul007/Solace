@@ -50,3 +50,30 @@ test('editing a recovered student rate restores the value of imported classes', 
   storage.updateStudent({ ...student, name: 'Actual student', subject: 'Math', ratePerClass: 500 });
   assert.equal(storage.getStudentBalance(student.id), 500);
 });
+
+test('adding a uniquely matching student adopts imported records without changing their IDs', () => {
+  values.clear();
+  const recovered = { id: 'old-id', name: 'Recovered student old-id', subject: 'Review imported record', ratePerClass: 0, phone: '', createdAt: '2026-01-01', recovered: true };
+  values.set('tt_students', JSON.stringify([recovered]));
+  values.set('communications', JSON.stringify([{ id: 'message-1', studentId: 'old-id', message: '📚 Test Result - Rafi Hasan\nScore: 8/10' }]));
+  values.set('test_results', JSON.stringify([{ id: 'test-1', studentId: 'old-id', testName: 'Quiz', subject: 'Math', date: '2026-01-02', maxMarks: 10, obtainedMarks: 8, percentage: 80, sentToParent: false }]));
+  assert.equal(storage.getRecoveredMatches('  rafi   HASAN ').length, 1);
+  const saved = storage.addStudent({ id: 'new-id', name: 'Rafi Hasan', subject: 'Math', ratePerClass: 500, phone: '', createdAt: '2026-11-19' });
+  assert.equal(saved.merged, true);
+  assert.equal(saved.student.id, 'old-id');
+  assert.equal(storage.getStudents().length, 1);
+  assert.equal(storage.getStudents()[0].recovered, false);
+  assert.equal(JSON.parse(values.get('test_results'))[0].studentId, 'old-id');
+  assert.equal(JSON.parse(values.get('communications'))[0].studentId, 'old-id');
+});
+
+test('ambiguous imported names stay separate when a student is added', () => {
+  values.clear();
+  const placeholders = ['old-a', 'old-b'].map(id => ({ id, name: `Recovered student ${id}`, subject: 'Review imported record', ratePerClass: 0, phone: '', createdAt: '2026-01-01', recovered: true }));
+  values.set('tt_students', JSON.stringify(placeholders));
+  values.set('communications', JSON.stringify(placeholders.map(student => ({ id: `message-${student.id}`, studentId: student.id, message: '📚 Test Result - Rafi Hasan\nScore: 8/10' }))));
+  assert.equal(storage.getRecoveredMatches('Rafi Hasan').length, 2);
+  const saved = storage.addStudent({ id: 'new-id', name: 'Rafi Hasan', subject: 'Math', ratePerClass: 500, phone: '', createdAt: '2026-11-19' });
+  assert.equal(saved.merged, false);
+  assert.equal(storage.getStudents().length, 3);
+});

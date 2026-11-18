@@ -151,6 +151,7 @@ export const recoverMissingStudents = (backup: AppBackup): AppBackup => {
         ratePerClass: 0,
         phone: '',
         createdAt,
+        recovered: true,
       }))],
     },
   };

@@ -9,6 +9,8 @@ import { AnnouncementsPanel } from '../components/communications/AnnouncementsPa
 import { HomeworkPanel } from '../components/communications/HomeworkPanel';
 import { SchedulePanel } from '../components/communications/SchedulePanel';
 import { NotificationsPanel } from '../components/communications/NotificationsPanel';
+import { isRecoveredStudent } from '../services/recoveredStudents';
+import type { Student } from '../types';
 
 type Tab = 'Messages' | 'Announcements' | 'Homework' | 'Classes' | 'Notifications';
 export const Connect: React.FC = () => {
@@ -23,7 +25,7 @@ export const Connect: React.FC = () => {
   useEffect(() => liveEvents(() => setRevision(value => value + 1)), []);
   useEffect(() => {
     if (account?.role !== 'TUTOR') return;
-    api<{data:{students:StudentChoice[]}}>('/api/tutor/data').then(result => setStudents(result.data.students)).catch(e => setError(e.message));
+    api<{data:{students:StudentChoice[]}}>('/api/tutor/data').then(result => setStudents(result.data.students.filter(student => !isRecoveredStudent(student as Student)))).catch(e => setError(e.message));
   }, [account?.role]);
   return <Layout title="Connect" studentMode={account?.role === 'STUDENT'} wide><div className="space-y-4">
     <div role="tablist" aria-label="Communication sections" className="flex gap-2 overflow-x-auto pb-1">

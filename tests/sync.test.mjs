@@ -51,3 +51,26 @@ test('repair keeps the new student and the imported test result while saving', a
     assert.equal(values.get('solace_pending_sync'), undefined);
   } finally { globalThis.fetch = previousFetch; }
 });
+
+test('first import preserves orphan records as recoverable students', async () => {
+  values.clear();
+  const result = { id: 'test-2', studentId: 'missing-2', testName: 'Quiz', subject: 'Math', date: '2026-01-02', maxMarks: 10, obtainedMarks: 7, percentage: 70, sentToParent: false };
+  values.set('test_results', JSON.stringify([result]));
+  const previousFetch = globalThis.fetch;
+  let imported;
+  globalThis.fetch = async (_url, options = {}) => {
+    if (options.method === 'POST') {
+      imported = JSON.parse(options.body);
+      return new Response(JSON.stringify({ imported: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return new Response(JSON.stringify(backup([])), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    await sync.loadTutorData();
+    assert.equal(imported.data.students.length, 1);
+    assert.equal(imported.data.students[0].id, 'missing-2');
+    assert.equal(imported.data.students[0].recovered, true);
+    assert.deepEqual(imported.data.testResults, [result]);
+    assert.equal(JSON.parse(values.get('tt_students'))[0].id, 'missing-2');
+  } finally { globalThis.fetch = previousFetch; }
+});

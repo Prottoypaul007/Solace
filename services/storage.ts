@@ -1,14 +1,30 @@
 import { Student, ClassSession, Payment, TestResult, ParentContact, Communication } from '../types';
 import { DATA_KEYS, readList, writeBatch, writeList } from './dataStore';
+import { isRecoveredStudent, matchingRecoveredStudents } from './recoveredStudents';
 
 export const getStudents = (): Student[] => readList<Student>(DATA_KEYS.students);
 export const getStudentById = (id: string): Student | undefined => getStudents().find(student => student.id === id);
-export const addStudent = (student: Student): void => writeList(DATA_KEYS.students, [...getStudents(), student]);
+export const getRecoveredMatches = (name: string): Student[] =>
+  matchingRecoveredStudents(name, getStudents(), readList<Communication>(DATA_KEYS.communications));
+
+export const addStudent = (student: Student): { student: Student; merged: boolean } => {
+  const students = getStudents();
+  if (students.some(item => item.id === student.id)) throw new Error('This student ID already exists.');
+  const matches = matchingRecoveredStudents(student.name, students, readList<Communication>(DATA_KEYS.communications));
+  if (matches.length === 1) {
+    const linked = { ...student, id: matches[0].id, recovered: false };
+    writeList(DATA_KEYS.students, students.map(item => item.id === linked.id ? linked : item));
+    return { student: linked, merged: true };
+  }
+  writeList(DATA_KEYS.students, [...students, student]);
+  return { student, merged: false };
+};
 export const updateStudent = (student: Student): void => {
   const students = getStudents();
   const previous = students.find(item => item.id === student.id);
   if (!previous) throw new Error('Student not found.');
-  const updatedStudents = students.map(item => item.id === student.id ? student : item);
+  const saved = isRecoveredStudent(previous) ? { ...student, recovered: false } : student;
+  const updatedStudents = students.map(item => item.id === student.id ? saved : item);
   const recoveredPlaceholder = previous.ratePerClass === 0 && previous.name.startsWith('Recovered student ') && previous.subject === 'Review imported record';
   if (previous.ratePerClass !== student.ratePerClass && !recoveredPlaceholder) {
     const updatedClasses = getClasses().map(item => item.studentId === student.id && item.rateCharged === undefined

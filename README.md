@@ -124,6 +124,8 @@ The app's display name is **Solace**. Its Android application ID is still `com.t
 
 On first tutor login, if the server has no records, the app imports the existing device records without changing their IDs. If this device and server both have different records, the app stops and shows both sets of counts before either side is replaced. Save a separate backup and choose which set to keep. Editing sends the six record collections to the server. A failed send leaves the local changes pending and shows a warning; **Settings** offers a retry. Signing out waits for pending changes and clears the tutor cache. Keep regular JSON exports and database backups; the JSON export contains personal information and is not encrypted.
 
+When a backup contains records for a missing student profile, Solace keeps them under **Students → Imported records**. Adding a student whose name uniquely and exactly matches the name in those records' test-result messages adopts the imported student ID, so linked tests, parent contacts, and messages appear on that student's profile automatically. Name matching ignores letter case and repeated spaces. If the name is unknown or more than one imported entry matches, Solace leaves the records separate for manual review.
+
 Student login is invitation only. Open a student profile and choose **Enable student login**, enter their email, and share the generated link privately. The link expires after 48 hours and is single use. Students see their own profile, completed class history, test results, scheduled classes, messages, announcements, homework, and notifications. The existing completed-class records have no attendance flag; the new scheduled-class table is separate so historical records remain intact.
 
 ## Communication

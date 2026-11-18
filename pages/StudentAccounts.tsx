@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout';
 import { Student } from '../types';
 import { api, post } from '../services/api';
 import { retrySync } from '../services/sync';
+import { isRecoveredStudent } from '../services/recoveredStudents';
 
 interface LinkedAccount { id: string; studentId: string; email: string; status: 'PENDING' | 'ACTIVE' | 'DISABLED'; studentName: string }
 interface TutorData { data: { students: Student[] } }
@@ -22,7 +23,7 @@ export const StudentAccounts: React.FC = () => {
   const reload = async () => {
     await retrySync();
     const [records, linked] = await Promise.all([api<TutorData>('/api/tutor/data'), api<LinkedAccount[]>('/api/tutor/accounts')]);
-    setStudents(records.data.students); setAccounts(linked);
+    setStudents(records.data.students.filter(student => !isRecoveredStudent(student))); setAccounts(linked);
   };
   useEffect(() => { void reload().catch(e => setError(e.message)); }, []);
   const run = async (action: () => Promise<unknown>) => {
