@@ -7,6 +7,7 @@ import { Layout } from '../components/Layout';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import type { ClassSession, Payment, Student } from '../types';
+import { isRecoveredStudent } from '../services/recoveredStudents';
 import {
   addClassSession, addPayment, deleteClassSession, deletePayment, deleteStudent,
   getClassesByStudent, getPaymentsByStudent, getStudentBalance, getStudentById,
@@ -143,6 +144,7 @@ export const StudentDetail: React.FC = () => {
   return (
     <Layout title={student.name} showBack onBack={() => navigate('/students')}>
       <div className="space-y-6 pb-4">
+        {isRecoveredStudent(student) && <div role="status" className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm leading-5 text-amber-100">These imported records are safe. Tap the pencil to enter the student's correct name, subject, and rate. The linked records will remain with this student.</div>}
         <section className="rounded-3xl border border-white/10 bg-slate-900 p-5">
           <div className="flex items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-500/15 text-lg font-bold text-blue-200">{student.name.trim().slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><h2 className="truncate text-lg font-bold">{student.name}</h2><p className="text-sm text-slate-300">{student.subject} · ৳{student.ratePerClass.toLocaleString('en-BD')} per class</p>{student.phone && <p className="mt-1 text-sm text-slate-400">{student.phone}</p>}</div>
             <button aria-label="Edit student" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-blue-300" onClick={() => { setStudentForm({ name: student.name, subject: student.subject, rate: String(student.ratePerClass), phone: student.phone }); setEditStudentOpen(true); setError(''); }}><Pencil size={18} /></button></div>
@@ -176,7 +178,7 @@ export const StudentDetail: React.FC = () => {
               <div className="mt-2 flex items-center justify-between"><span className="flex items-center gap-1 text-xs text-slate-400"><Calendar size={12} />{format(new Date(record.date), 'dd MMM yyyy')}</span><div className="flex gap-1"><button aria-label={`Edit ${kind}`} className="flex h-11 w-11 items-center justify-center rounded-xl text-blue-300 active:bg-slate-800" onClick={() => { setError(''); if (kind === 'class') { const item = record as ClassSession; setEditingClass(item); setClassForm({ date: item.date.slice(0, 10), duration: String(item.durationMinutes), topic: item.topic || '' }); setClassOpen(true); } else { const item = record as Payment; setEditingPayment(item); setPaymentForm({ date: item.date.slice(0, 10), amount: String(item.amount), note: item.note || '' }); setPaymentOpen(true); } }}><Pencil size={18} /></button><button aria-label={`Delete ${kind}`} className="flex h-11 w-11 items-center justify-center rounded-xl text-rose-300 active:bg-slate-800" onClick={() => removeRecord(record, kind)}><Trash2 size={18} /></button></div></div>
             </div>)}</div>
         </section>
-        <Button variant="danger" fullWidth onClick={removeStudent}>Delete student</Button>
+        {!isRecoveredStudent(student) && <Button variant="danger" fullWidth onClick={removeStudent}>Delete student</Button>}
       </div>
 
       {editStudentOpen && <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4"><form onSubmit={saveStudent} className="max-h-[90dvh] w-full max-w-sm space-y-3 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-4"><h3 className="font-semibold">Edit student</h3><Input label="Name" value={studentForm.name} onChange={event => setStudentForm({ ...studentForm, name: event.target.value })} /><Input label="Subject" value={studentForm.subject} onChange={event => setStudentForm({ ...studentForm, subject: event.target.value })} /><Input label="Rate per class" type="number" min="0.01" step="any" value={studentForm.rate} onChange={event => setStudentForm({ ...studentForm, rate: event.target.value })} /><Input label="Phone" value={studentForm.phone} onChange={event => setStudentForm({ ...studentForm, phone: event.target.value })} />{error && <p role="alert" className="text-xs text-rose-300">{error}</p>}<div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setEditStudentOpen(false)}>Cancel</Button><Button type="submit">Save</Button></div></form></div>}

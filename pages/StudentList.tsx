@@ -51,7 +51,7 @@ export const StudentList: React.FC = () => {
             <div className="flex items-center gap-3">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-500/15 text-base font-bold text-blue-200">{student.name.trim().slice(0, 1).toUpperCase()}</span>
               <span className="min-w-0 flex-1"><span className="block truncate text-base font-semibold">{student.name}</span><span className="mt-0.5 block truncate text-sm text-slate-400">{showRecovered ? `Possible name: ${inferredRecoveredName(student, messages) || 'Unknown'}` : student.subject}</span></span>
-              <ArrowRight size={18} className="shrink-0 text-slate-500" />
+              {showRecovered ? <span className="shrink-0 text-xs font-semibold text-blue-300">Review & edit</span> : <ArrowRight size={18} className="shrink-0 text-slate-500" />}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-xs">
               <span className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-slate-300">{count} class{count === 1 ? '' : 'es'}</span>

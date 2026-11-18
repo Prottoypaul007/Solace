@@ -2,10 +2,14 @@ import React, { useRef, useState } from 'react';
 import { Download, FileUp, ShieldCheck } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { Button } from '../components/Button';
+import { Input } from '../components/Input';
 import { AppBackup, backupCounts, createBackup, missingStudentReferences, parseBackup, recoverMissingStudents, restoreBackup } from '../services/backup';
 import { saveBackupFile } from '../services/backupShare';
 import { useNavigate } from 'react-router-dom';
 import { hasPendingChanges, recordChanged, repairImportedRecords, retrySync } from '../services/sync';
+import { applyImportCorrections, ImportCorrection } from '../services/importReview';
+import { inferredRecoveredName, isRecoveredStudent } from '../services/recoveredStudents';
+import type { Communication, Student } from '../types';
 
 const labels: Record<string, string> = {
   students: 'Students',
@@ -24,7 +28,11 @@ export const BackupSettings: React.FC = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [corrections, setCorrections] = useState<Record<string, ImportCorrection>>({});
   const missing = missingStudentReferences(createBackup());
+  const importPreview = selected ? recoverMissingStudents(selected) : null;
+  const importedStudents = importPreview?.data.students.filter(record => isRecoveredStudent(record as unknown as Student)) || [];
+  const importedMessages = (importPreview?.data.communications || []) as unknown as Communication[];
 
   const repair = async () => {
     setBusy(true); setError(''); setNotice('');
@@ -52,6 +60,7 @@ export const BackupSettings: React.FC = () => {
 
   const selectFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelected(null);
+    setCorrections({});
     setError('');
     setNotice('');
     const file = event.target.files?.[0];
@@ -66,20 +75,27 @@ export const BackupSettings: React.FC = () => {
     event.target.value = '';
   };
 
-  const restore = () => {
+  const restore = async () => {
     if (!selected) return;
     setBusy(true);
     setError('');
+    let changedOnDevice = false;
     try {
-      const prepared = recoverMissingStudents(selected);
+      const prepared = applyImportCorrections(selected, corrections);
       restoreBackup(prepared);
+      changedOnDevice = true;
       recordChanged();
+      await retrySync();
       setSelected(null);
-      setNotice(prepared.data.students.length > selected.data.students.length
-        ? 'Backup restored. Imported records for missing students are kept and will link automatically when you add an exact matching student name.'
-        : 'Backup restored. Your students and records are ready to use.');
+      setCorrections({});
+      setNotice(Object.keys(corrections).length > 0
+        ? 'Backup saved. Edited student profiles and all their linked records were kept.'
+        : importedStudents.length > 0
+          ? 'Backup saved. Unmatched records are kept under Students → Imported records for later review or matching.'
+          : 'Backup saved. Your students and records are ready to use.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not restore this backup.');
+      const message = cause instanceof Error ? cause.message : 'Could not restore or sync this backup.';
+      setError(changedOnDevice ? `${message} The records remain on this device; use Retry saving device changes.` : message);
     } finally {
       setBusy(false);
     }
@@ -129,9 +145,36 @@ export const BackupSettings: React.FC = () => {
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-200">
                 {backupCounts(selected).map(({ collection, count }) => <p key={collection}>{labels[collection]}: {count}</p>)}
               </div>
-              {missingStudentReferences(selected).length > 0 && <p className="mt-3 text-xs leading-5 text-amber-200">This file has records for {missingStudentReferences(selected).length} students absent from its student list. Solace will keep them as imported records until you add a student with a unique exact name match.</p>}
+              {importedStudents.length > 0 && <div className="mt-4 space-y-3">
+                <h3 className="text-sm font-semibold text-amber-100">Review {importedStudents.length} imported student record{importedStudents.length === 1 ? '' : 's'}</h3>
+                <p className="text-xs leading-5 text-amber-100/85">Edit any student details you know. Their tests, contacts, messages, classes, and payments will stay linked to the same ID. Leave uncertain entries as imported records to review later.</p>
+                {importedStudents.map(record => {
+                  const student = record as unknown as Student;
+                  const draft = corrections[student.id];
+                  const suggested = inferredRecoveredName(student, importedMessages);
+                  const linked = (['classes', 'payments', 'testResults', 'parentContacts', 'communications'] as const)
+                    .map(collection => ({ collection, count: importPreview?.data[collection].filter(item => item.studentId === student.id).length || 0 }))
+                    .filter(item => item.count > 0);
+                  const testSubjects = [...new Set(importPreview?.data.testResults.filter(item => item.studentId === student.id).map(item => String(item.subject)) || [])];
+                  return <div key={student.id} className="rounded-xl border border-white/10 bg-slate-900/80 p-3 space-y-2">
+                    <p className="text-sm font-semibold">{student.name}</p>
+                    {suggested && <p className="text-xs text-blue-200">Possible name from messages: {suggested}</p>}
+                    <p className="text-xs text-slate-300">{linked.map(({ collection, count }) => `${count} ${labels[collection]}`).join(' · ')}</p>
+                    <button type="button" aria-expanded={Boolean(draft)} className="min-h-11 text-sm font-semibold text-blue-300" onClick={() => setCorrections(previous => {
+                      if (previous[student.id]) { const next = { ...previous }; delete next[student.id]; return next; }
+                      return { ...previous, [student.id]: { name: suggested || '', subject: testSubjects.length === 1 ? testSubjects[0] : '', rate: '', phone: '' } };
+                    })}>{draft ? 'Keep for later instead' : 'Edit student details'}</button>
+                    {draft && <div className="grid gap-3 border-t border-white/10 pt-3">
+                      <Input label="Student name" value={draft.name} onChange={event => setCorrections(previous => ({ ...previous, [student.id]: { ...previous[student.id], name: event.target.value } }))} />
+                      <Input label="Subject" value={draft.subject} onChange={event => setCorrections(previous => ({ ...previous, [student.id]: { ...previous[student.id], subject: event.target.value } }))} />
+                      <Input label="Rate per class (৳)" type="number" min="0.01" step="any" value={draft.rate} onChange={event => setCorrections(previous => ({ ...previous, [student.id]: { ...previous[student.id], rate: event.target.value } }))} />
+                      <Input label="Phone (optional)" value={draft.phone} onChange={event => setCorrections(previous => ({ ...previous, [student.id]: { ...previous[student.id], phone: event.target.value } }))} />
+                    </div>}
+                  </div>;
+                })}
+              </div>}
               <p className="mt-3 text-xs leading-5 text-amber-200">Restoring replaces all current records. Save a backup of this device first if you want to keep them.</p>
-              <Button className="mt-3" variant="danger" fullWidth disabled={busy} onClick={restore}>Replace current data</Button>
+              <Button className="mt-3" variant="danger" fullWidth disabled={busy} onClick={() => void restore()}>{busy ? 'Restoring and saving…' : 'Replace current data'}</Button>
             </div>
           )}
         </section>
