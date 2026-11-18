@@ -20,7 +20,7 @@ const options = (allowSignUp) => ({
     autoSignIn: false,
     revokeSessionsOnPasswordReset: true,
   },
-  session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
+  session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
   rateLimit: { enabled: true, window: 60, max: 60, customRules: { '/sign-in/email': { window: 60, max: 5 } } },
   advanced: {
     ipAddress: { ipAddressHeaders: ['x-solace-client-ip'] },

@@ -11,6 +11,8 @@
   scrollbar-width: none;
 }
 body {
-  background-color: #f3f4f6;
+  background-color: #020617;
+  color-scheme: dark;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }

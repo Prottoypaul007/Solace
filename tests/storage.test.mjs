@@ -27,3 +27,17 @@ test('balance survives a rate change and a deleted student can be restored', () 
   storage.restoreStudent(snapshot);
   assert.equal(storage.getStudentBalance('s'), 300);
 });
+
+test('the student whose class was just logged moves to the top even for an older class date', () => {
+  values.clear();
+  const students = [
+    { id: 'a', name: 'Ada', subject: 'Math', ratePerClass: 500, phone: '', createdAt: '2026-01-01' },
+    { id: 'b', name: 'Bina', subject: 'Math', ratePerClass: 500, phone: '', createdAt: '2026-01-01' },
+  ];
+  students.forEach(storage.addStudent);
+  values.set('tt_classes', JSON.stringify([{ id: 'old', studentId: 'a', date: '2026-11-18T12:00:00.000Z', durationMinutes: 60 }]));
+  storage.addClassSession({ id: 'new', studentId: 'b', date: '2026-09-01T12:00:00.000Z', durationMinutes: 60 });
+  assert.equal(storage.sortStudentsByRecentClass(storage.getStudents(), storage.getClasses())[0].id, 'b');
+  storage.deleteClassSession('new');
+  assert.equal(storage.sortStudentsByRecentClass(storage.getStudents(), storage.getClasses())[0].id, 'a');
+});

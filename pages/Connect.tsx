@@ -27,7 +27,7 @@ export const Connect: React.FC = () => {
   }, [account?.role]);
   return <Layout title="Connect" studentMode={account?.role === 'STUDENT'} wide><div className="space-y-4">
     <div role="tablist" aria-label="Communication sections" className="flex gap-2 overflow-x-auto pb-1">
-      {(['Messages','Announcements','Homework','Classes','Notifications'] as Tab[]).map(item => <button key={item} role="tab" aria-selected={tab === item} onClick={() => setTab(item)} className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm ${tab === item ? 'bg-blue-600' : 'bg-slate-800 text-slate-300'}`}>{item}</button>)}
+      {(['Messages','Announcements','Homework','Classes','Notifications'] as Tab[]).map(item => <button key={item} role="tab" aria-selected={tab === item} onClick={() => setTab(item)} className={`min-h-11 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${tab === item ? 'bg-blue-600' : 'bg-slate-800 text-slate-300'}`}>{item}</button>)}
     </div>
     {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
     {tab === 'Messages' && <MessagesPanel revision={revision} focusStudent={focusStudent} />}

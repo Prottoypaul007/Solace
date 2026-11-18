@@ -11,6 +11,7 @@ export interface ClassSession {
   id: string;
   studentId: string;
   date: string; // ISO string
+  createdAt?: string; // When the class was logged; historical records may not have this.
   durationMinutes: number;
   rateCharged?: number; // Set for new classes; old records use the student's original rate until edited.
   topic?: string;

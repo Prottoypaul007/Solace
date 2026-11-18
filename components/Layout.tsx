@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Users, Settings, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Home, MessageCircle, Settings, Users } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,127 +11,46 @@ interface LayoutProps {
   wide?: boolean;
 }
 
-export const Layout: React.FC<LayoutProps> = ({
-  children,
-  title,
-  showBack = false,
-  onBack,
-  studentMode = false,
-  wide = false,
-}) => {
+export const Layout: React.FC<LayoutProps> = ({ children, title, showBack = false, onBack, studentMode = false, wide = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const items = studentMode
+    ? [
+        { label: 'Home', path: '/student-home', icon: Home, active: location.pathname === '/student-home' },
+        { label: 'Connect', path: '/connect', icon: MessageCircle, active: location.pathname === '/connect' },
+        { label: 'Account', path: '/student-account', icon: Settings, active: location.pathname === '/student-account' },
+      ]
+    : [
+        { label: 'Home', path: '/', icon: Home, active: location.pathname === '/' },
+        { label: 'Students', path: '/students', icon: Users, active: location.pathname === '/students' || location.pathname.startsWith('/student/') || location.pathname === '/add-student' },
+        { label: 'Connect', path: '/connect', icon: MessageCircle, active: location.pathname === '/connect' },
+        { label: 'Settings', path: '/settings', icon: Settings, active: location.pathname === '/settings' || location.pathname === '/account' || location.pathname === '/student-accounts' },
+      ];
 
-  const isActive = (path: string) => location.pathname === path;
-
-  const navButtonClasses = (active: boolean) =>
-    `flex flex-col items-center justify-center gap-0.5 text-[11px] ${
-      active ? 'text-blue-400' : 'text-slate-400'
-    }`;
-
-  const iconWrapperClasses = (active: boolean) =>
-    `h-9 w-9 flex items-center justify-center rounded-2xl border transition-all ${
-      active
-        ? 'bg-blue-500/15 border-blue-400/70 shadow-lg shadow-blue-500/30'
-        : 'bg-white/5 border-white/10'
-    }`;
-
-  return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      {/* Header */}
-      <header className="pt-10 pb-4 px-5 bg-gradient-to-b from-slate-950/95 to-slate-900/95 shadow-lg shadow-black/40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {showBack ? (
-              <button
-                onClick={() => (onBack ? onBack() : navigate(-1))}
-                className="h-9 w-9 rounded-full flex items-center justify-center bg-white/5 border border-white/20"
-              >
-                <span className="text-lg leading-none">&larr;</span>
-              </button>
-            ) : (
-              <div className="h-9 w-9 rounded-2xl bg-blue-500/20 border border-blue-400/50 flex items-center justify-center text-xs font-semibold tracking-tight">
-                TT
-              </div>
-            )}
-
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">
-                {title ?? 'Solace'}
-              </h1>
-              <p className="text-[11px] text-slate-300">
-                {studentMode ? 'Your classes and results' : 'Track students, classes & payments in one place'}
-              </p>
-            </div>
-          </div>
+  return <div className="min-h-screen bg-slate-950 text-slate-50">
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/95 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl">
+      <div className={`mx-auto flex items-center gap-3 ${wide ? 'max-w-5xl' : 'max-w-xl'}`}>
+        {showBack ? <button type="button" aria-label="Go back" onClick={() => onBack ? onBack() : navigate(-1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-800 text-slate-100 active:bg-slate-700"><ArrowLeft size={20} /></button>
+          : <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-500 text-lg font-bold text-white shadow-lg shadow-blue-500/20">S</div>}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">Solace</p>
+          <h1 className="truncate text-xl font-bold leading-tight tracking-tight">{title || (studentMode ? 'My learning' : 'Home')}</h1>
         </div>
-      </header>
+      </div>
+    </header>
 
-      {/* Main content */}
-      <main className="flex-1 px-5 pb-24 -mt-3">
-        <div className={`bg-slate-900/80 border border-white/10 rounded-3xl shadow-2xl shadow-black/50 p-4 backdrop-blur-md ${wide ? 'max-w-5xl' : 'max-w-md'} mx-auto h-[calc(100vh-7.5rem)] overflow-y-auto no-scrollbar`}>
-          {children}
-        </div>
-      </main>
+    <main className={`mx-auto w-full px-4 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] pt-5 ${wide ? 'max-w-5xl' : 'max-w-xl'}`}>{children}</main>
 
-      {/* Bottom nav */}
-      <nav className="fixed left-0 right-0 bottom-0 z-20">
-        <div className="mx-auto max-w-md mb-4 px-4">
-          <div className="bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl shadow-black/60 px-6 py-2 flex items-center justify-between backdrop-blur-lg">
-            {studentMode && <button onClick={() => navigate('/student-home')} className={navButtonClasses(isActive('/student-home'))}>
-              <div className={iconWrapperClasses(isActive('/student-home'))}><Home size={20} /></div><span className="font-medium">Home</span>
-            </button>}
-
-            <button onClick={() => navigate('/connect')} className={navButtonClasses(isActive('/connect'))}>
-              <div className={iconWrapperClasses(isActive('/connect'))}><MessageCircle size={20} /></div><span className="font-medium">Connect</span>
-            </button>
-            {/* Home */}
-            {!studentMode && <button
-              onClick={() => navigate('/')}
-              className={navButtonClasses(isActive('/'))}
-            >
-              <div className={iconWrapperClasses(isActive('/'))}>
-                <Home size={20} strokeWidth={isActive('/') ? 2.5 : 2} />
-              </div>
-              <span className="font-medium">Home</span>
-            </button>}
-
-            {/* Students */}
-            {!studentMode && <button
-              onClick={() => navigate('/students')}
-              className={navButtonClasses(isActive('/students') || location.pathname.startsWith('/student'))}
-            >
-              <div
-                className={iconWrapperClasses(
-                  isActive('/students') || location.pathname.startsWith('/student')
-                )}
-              >
-                <Users
-                  size={20}
-                  strokeWidth={
-                    isActive('/students') ||
-                    location.pathname.startsWith('/student')
-                      ? 2.5
-                      : 2
-                  }
-                />
-              </div>
-              <span className="font-medium">Students</span>
-            </button>}
-
-            {/* Backup and restore */}
-            <button
-              onClick={() => navigate(studentMode ? '/student-account' : '/settings')}
-              className={navButtonClasses(isActive(studentMode ? '/student-account' : '/settings'))}
-            >
-              <div className={iconWrapperClasses(isActive(studentMode ? '/student-account' : '/settings'))}>
-                <Settings size={20} />
-              </div>
-              <span className="font-medium">{studentMode ? 'Account' : 'Settings'}</span>
-            </button>
-          </div>
-        </div>
-      </nav>
-    </div>
-  );
+    <nav aria-label="Main navigation" className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-slate-950/95 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-12px_32px_rgba(2,6,23,0.6)] backdrop-blur-xl">
+      <div className="mx-auto flex max-w-xl justify-around gap-1">
+        {items.map(item => {
+          const Icon = item.icon;
+          return <button key={item.path} type="button" aria-current={item.active ? 'page' : undefined} onClick={() => navigate(item.path)} className={`flex min-h-14 min-w-16 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-xs font-semibold transition-colors active:scale-[0.97] ${item.active ? 'bg-blue-500/15 text-blue-300' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'}`}>
+            <Icon size={21} strokeWidth={item.active ? 2.5 : 2} />
+            <span>{item.label}</span>
+          </button>;
+        })}
+      </div>
+    </nav>
+  </div>;
 };

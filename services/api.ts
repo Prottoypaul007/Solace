@@ -1,5 +1,9 @@
 export const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:3005').replace(/\/$/, '');
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) { super(message); }
+}
+
 export interface CurrentAccount {
   id: string;
   role: 'TUTOR' | 'STUDENT';
@@ -19,7 +23,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (response.status === 401 && !path.startsWith('/api/auth/') && !path.startsWith('/api/public/')) {
     window.dispatchEvent(new Event('solace-auth-expired'));
   }
-  if (!response.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Request failed. Please try again.');
+  if (!response.ok) throw new ApiError(typeof body.error === 'string' ? body.error : 'Request failed. Please try again.', response.status);
   return body as T;
 }
 

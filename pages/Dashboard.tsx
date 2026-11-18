@@ -1,149 +1,64 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, BookOpen, MessageCircle, Plus, Users, Wallet } from 'lucide-react';
 import { Layout } from '../components/Layout';
-import {
-  getStudents,
-  getClasses,
-  getPayments,
-  getStudentBalance,
-} from '../services/storage';
+import { getClasses, getPayments, getStudentBalance, getStudents, sortStudentsByRecentClass } from '../services/storage';
 import { getUnsentTestResults } from '../services/communication';
-import { DollarSign, BookOpen, Users, Send } from 'lucide-react';
+
+const money = (amount: number) => `৳${amount.toLocaleString('en-BD')}`;
 
 export const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    totalClasses: 0,
-    totalEarnings: 0,
-    pendingBalance: 0,
-    unsentResults: 0,
-  });
+  const navigate = useNavigate();
+  const students = getStudents();
+  const classes = getClasses();
+  const payments = getPayments();
+  const recent = sortStudentsByRecentClass(students, classes).slice(0, 3);
+  const received = payments.reduce((sum, item) => sum + item.amount, 0);
+  const due = students.reduce((sum, item) => sum + Math.max(0, getStudentBalance(item.id)), 0);
+  const unsent = getUnsentTestResults().length;
+  const stats = [
+    { label: 'Students', value: students.length.toLocaleString(), icon: Users, tone: 'text-blue-300 bg-blue-500/15' },
+    { label: 'Classes logged', value: classes.length.toLocaleString(), icon: BookOpen, tone: 'text-violet-300 bg-violet-500/15' },
+    { label: 'Received', value: money(received), icon: Wallet, tone: 'text-emerald-300 bg-emerald-500/15' },
+    { label: 'To collect', value: money(due), icon: Wallet, tone: 'text-amber-300 bg-amber-500/15' },
+  ];
 
-  useEffect(() => {
-    const students = getStudents();
-    const classes = getClasses();
-    const payments = getPayments();
-    const unsentResults = getUnsentTestResults();
+  return <Layout title="Home">
+    <div className="space-y-6">
+      <section className="overflow-hidden rounded-3xl border border-blue-400/20 bg-gradient-to-br from-blue-600 to-indigo-800 p-5 shadow-xl shadow-blue-950/30">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-100/80">Your workspace</p>
+        <h2 className="mt-2 text-2xl font-bold leading-tight">Everything for today,<br />in one place.</h2>
+        <p className="mt-2 text-sm leading-5 text-blue-100/85">Open a student to log a class, record a payment, or review progress.</p>
+        <button onClick={() => navigate('/students')} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-blue-800 active:scale-[0.98]">Open students <ArrowRight size={17} /></button>
+      </section>
 
-    const totalEarnings = payments.reduce((sum, p) => sum + p.amount, 0);
-    const pendingBalance = students.reduce(
-      (sum, s) => sum + getStudentBalance(s.id),
-      0
-    );
+      <section aria-label="Overview statistics" className="grid grid-cols-2 gap-3">
+        {stats.map(stat => <div key={stat.label} className="min-w-0 rounded-2xl border border-white/10 bg-slate-900 p-4">
+          <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${stat.tone}`}><stat.icon size={19} /></div>
+          <p className="mt-4 truncate text-xl font-bold tracking-tight">{stat.value}</p>
+          <p className="mt-1 text-sm text-slate-400">{stat.label}</p>
+        </div>)}
+      </section>
 
-    setStats({
-      totalStudents: students.length,
-      totalClasses: classes.length,
-      totalEarnings,
-      pendingBalance,
-      unsentResults: unsentResults.length,
-    });
-  }, []);
+      <section>
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Quick actions</h2></div>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => navigate('/add-student')} className="flex min-h-16 items-center gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4 text-left text-sm font-semibold active:bg-slate-800"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-300"><Plus size={19} /></span>Add student</button>
+          <button onClick={() => navigate('/connect')} className="flex min-h-16 items-center gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4 text-left text-sm font-semibold active:bg-slate-800"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300"><MessageCircle size={19} /></span>Messages</button>
+        </div>
+      </section>
 
-  return (
-    <Layout title="Overview">
-      <div className="space-y-5">
-        {/* Greeting / hero */}
-        <section className="bg-gradient-to-r from-blue-600/80 via-blue-500/80 to-sky-400/80 rounded-2xl px-4 py-4 shadow-lg shadow-blue-500/30 border border-white/20 text-white">
-          <p className="text-xs uppercase tracking-[0.15em] font-semibold opacity-90">
-            Today&apos;s snapshot
-          </p>
-          <h2 className="mt-1 text-lg font-semibold">Your tutoring at a glance</h2>
-          <p className="mt-1 text-[11px] opacity-90">
-            See how many students, classes and payments you&apos;ve managed so far.
-          </p>
-        </section>
+      <section>
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Recent students</h2><button className="text-sm font-semibold text-blue-300" onClick={() => navigate('/students')}>See all</button></div>
+        {recent.length === 0 ? <div className="rounded-2xl border border-dashed border-white/15 bg-slate-900/50 p-5 text-sm text-slate-400">No students yet. Add your first student to get started.</div>
+          : <div className="space-y-2">{recent.map(student => <button key={student.id} onClick={() => navigate(`/student/${student.id}`)} className="flex min-h-16 w-full items-center gap-3 rounded-2xl border border-white/10 bg-slate-900 p-3 text-left active:bg-slate-800">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-500/15 text-sm font-bold text-blue-200">{student.name.trim().slice(0, 1).toUpperCase()}</span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{student.name}</span><span className="block truncate text-xs text-slate-400">{student.subject}</span></span>
+            <ArrowRight size={17} className="shrink-0 text-slate-500" />
+          </button>)}</div>}
+      </section>
 
-        {/* Main stats */}
-        <section className="grid grid-cols-2 gap-3">
-          {/* Students */}
-          <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3 shadow-md shadow-black/40 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Students</span>
-              <span className="h-7 w-7 rounded-xl bg-blue-500/20 border border-blue-400/60 flex items-center justify-center">
-                <Users size={16} className="text-blue-300" />
-              </span>
-            </div>
-            <div className="text-2xl font-semibold">
-              {stats.totalStudents.toString()}
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Active student profiles saved.
-            </p>
-          </div>
-
-          {/* Classes */}
-          <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3 shadow-md shadow-black/40 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Classes</span>
-              <span className="h-7 w-7 rounded-xl bg-emerald-500/15 border border-emerald-400/60 flex items-center justify-center">
-                <BookOpen size={16} className="text-emerald-300" />
-              </span>
-            </div>
-            <div className="text-2xl font-semibold">
-              {stats.totalClasses.toString()}
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Total classes logged across students.
-            </p>
-          </div>
-
-          {/* Total earnings */}
-          <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3 shadow-md shadow-black/40 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Total received</span>
-              <span className="h-7 w-7 rounded-xl bg-emerald-500/20 border border-emerald-400/70 flex items-center justify-center">
-                <DollarSign size={16} className="text-emerald-200" />
-              </span>
-            </div>
-            <div className="text-xl font-semibold">
-              ৳{stats.totalEarnings.toLocaleString()}
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Payments you have already collected.
-            </p>
-          </div>
-
-          {/* Pending */}
-          <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3 shadow-md shadow-black/40 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Pending</span>
-              <span className="h-7 w-7 rounded-xl bg-amber-500/15 border border-amber-400/70 flex items-center justify-center">
-                <DollarSign size={16} className="text-amber-200" />
-              </span>
-            </div>
-            <div
-              className={`text-xl font-semibold ${
-                stats.pendingBalance > 0 ? 'text-amber-300' : 'text-emerald-300'
-              }`}
-            >
-              ৳{stats.pendingBalance.toLocaleString()}
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Amount to collect from all students.
-            </p>
-          </div>
-
-          {/* Unsent test results */}
-          <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3 shadow-md shadow-black/40 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Unsent Results</span>
-              <span className="h-7 w-7 rounded-xl bg-red-500/20 border border-red-400/60 flex items-center justify-center">
-                <Send size={16} className="text-red-300" />
-              </span>
-            </div>
-            <div className="text-2xl font-semibold">
-              {stats.unsentResults.toString()}
-            </div>
-            <p className="text-[11px] text-slate-400">
-              Test results yet to be sent to students.
-            </p>
-          </div>
-        </section>
-
-        <p className="text-center text-[10px] text-slate-500">
-          All data is stored locally on this device. No internet required.
-        </p>
-      </div>
-    </Layout>
-  );
+      {unsent > 0 && <button onClick={() => navigate('/students')} className="w-full rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-left text-sm text-amber-100"><span className="font-semibold">{unsent} test result{unsent === 1 ? '' : 's'} waiting to be shared.</span><span className="mt-1 block text-xs text-amber-200/75">Open a student to review them.</span></button>}
+    </div>
+  </Layout>;
 };

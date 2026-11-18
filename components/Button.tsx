@@ -15,7 +15,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseStyles =
-    'inline-flex items-center justify-center rounded-xl font-semibold tracking-tight transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed';
+    'inline-flex min-h-11 items-center justify-center rounded-xl font-semibold tracking-tight transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary:
@@ -29,9 +29,9 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const sizes: Record<NonNullable<ButtonProps['size']>, string> = {
-    sm: 'h-9 px-4 text-xs',
-    md: 'h-11 px-5 text-sm',
-    lg: 'h-13 px-6 text-base',
+    sm: 'min-h-11 px-4 text-sm',
+    md: 'min-h-12 px-5 text-sm',
+    lg: 'min-h-14 px-6 text-base',
   };
 
   return (

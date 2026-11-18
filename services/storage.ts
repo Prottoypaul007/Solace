@@ -68,7 +68,24 @@ export const restoreStudent = (snapshot: StudentSnapshot): void => {
 
 export const getClasses = (): ClassSession[] => readList<ClassSession>(DATA_KEYS.classes);
 export const getClassesByStudent = (studentId: string): ClassSession[] => getClasses().filter(item => item.studentId === studentId);
-export const addClassSession = (session: ClassSession): void => writeList(DATA_KEYS.classes, [...getClasses(), session]);
+export const addClassSession = (session: ClassSession): void =>
+  writeList(DATA_KEYS.classes, [...getClasses(), { ...session, createdAt: session.createdAt ?? new Date().toISOString() }]);
+export const sortStudentsByRecentClass = (students: Student[], classes: ClassSession[]): Student[] => {
+  const recent = new Map<string, { loggedAt: number; classDate: number }>();
+  for (const session of classes) {
+    const previous = recent.get(session.studentId) ?? { loggedAt: 0, classDate: 0 };
+    const loggedAt = Date.parse(session.createdAt || '') || 0;
+    const classDate = Date.parse(session.date) || 0;
+    recent.set(session.studentId, { loggedAt: Math.max(previous.loggedAt, loggedAt), classDate: Math.max(previous.classDate, classDate) });
+  }
+  return [...students].sort((a, b) => {
+    const left = recent.get(a.id), right = recent.get(b.id);
+    if (Boolean(left?.loggedAt) !== Boolean(right?.loggedAt)) return right?.loggedAt ? 1 : -1;
+    const leftTime = left?.loggedAt || left?.classDate || Date.parse(a.createdAt) || 0;
+    const rightTime = right?.loggedAt || right?.classDate || Date.parse(b.createdAt) || 0;
+    return rightTime - leftTime || a.name.localeCompare(b.name);
+  });
+};
 export const updateClassSession = (session: ClassSession): void => {
   const classes = getClasses();
   if (!classes.some(item => item.id === session.id)) throw new Error('Class not found.');
