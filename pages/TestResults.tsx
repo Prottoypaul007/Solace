@@ -13,6 +13,8 @@ import {
 } from '../services/communication';
 import { TestResult, Student, ParentContact } from '../types';
 import { Plus, Send, Trash2, Award, Users, MessageCircle } from 'lucide-react';
+import { smsService } from '../services/sms';
+import { Capacitor } from '@capacitor/core';
 
 export const TestResults: React.FC = () => {
   const { studentId } = useParams<{ studentId: string }>();
@@ -23,6 +25,7 @@ export const TestResults: React.FC = () => {
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedTest, setSelectedTest] = useState<TestResult | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // Form data for new test
   const [formData, setFormData] = useState({
@@ -49,29 +52,24 @@ export const TestResults: React.FC = () => {
 
   const handleAddTest = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentId || !formData.testName || !formData.maxMarks || !formData.obtainedMarks) return;
-
-    const newTest = addTestResult({
-      studentId,
-      testName: formData.testName,
-      subject: formData.subject || student?.subject || '',
-      maxMarks: parseInt(formData.maxMarks),
-      obtainedMarks: parseInt(formData.obtainedMarks),
-      date: new Date(formData.date).toISOString(),
-      notes: formData.notes,
-      sentToParent: false
-    });
-
-    setTestResults(prev => [...prev, newTest]);
-    setFormData({
-      testName: '',
-      subject: '',
-      maxMarks: '',
-      obtainedMarks: '',
-      date: new Date().toISOString().split('T')[0],
-      notes: ''
-    });
-    setShowAddTest(false);
+    if (!studentId) return;
+    const maximum = Number(formData.maxMarks);
+    const obtained = Number(formData.obtainedMarks);
+    if (!formData.testName.trim() || !formData.date || !formData.maxMarks || !formData.obtainedMarks ||
+        !Number.isFinite(maximum) || maximum <= 0 || !Number.isFinite(obtained) || obtained < 0 || obtained > maximum) {
+      setFormError('Enter a name, date, maximum above zero, and a score between zero and the maximum.');
+      return;
+    }
+    try {
+      const newTest = addTestResult({
+        studentId, testName: formData.testName.trim(), subject: formData.subject.trim() || student?.subject || '',
+        maxMarks: maximum, obtainedMarks: obtained, date: new Date(`${formData.date}T12:00:00`).toISOString(),
+        notes: formData.notes.trim(), sentToParent: false
+      });
+      setTestResults(prev => [...prev, newTest]);
+      setFormData({ testName: '', subject: '', maxMarks: '', obtainedMarks: '', date: new Date().toISOString().split('T')[0], notes: '' });
+      setFormError(''); setShowAddTest(false);
+    } catch (error) { setFormError(error instanceof Error ? error.message : 'Could not save test result.'); }
   };
   const handleSendToParent = async (testResult: TestResult, parentContact: ParentContact) => {
     setSendingMessage(true);
@@ -96,7 +94,7 @@ export const TestResults: React.FC = () => {
       }
     } catch (error) {
       console.error('Error sending SMS:', error);
-      alert(`❌ Failed to send SMS: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(error instanceof Error ? error.message : 'Could not finish sending SMS.');
     } finally {
       setSendingMessage(false);
       setShowSendModal(false);
@@ -105,8 +103,11 @@ export const TestResults: React.FC = () => {
   };
 
   const handleDeleteTest = (testId: string) => {
-    deleteTestResult(testId);
-    setTestResults(prev => prev.filter(test => test.id !== testId));
+    try {
+      deleteTestResult(testId);
+      setTestResults(prev => prev.filter(test => test.id !== testId));
+      setFormError('');
+    } catch (error) { setFormError(error instanceof Error ? error.message : 'Could not delete test result.'); }
   };
   const getGradeColor = (percentage: number) => {
     if (percentage >= 90) return 'bg-green-500/20 border-green-400/60 text-green-300';
@@ -120,6 +121,7 @@ export const TestResults: React.FC = () => {
   return (
     <Layout title={`Test Results - ${student.name}`}>
       <div className="space-y-5">
+        {formError && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-200">{formError}</p>}
         {/* Hero Section */}
         <section className="bg-gradient-to-r from-purple-600/80 via-purple-500/80 to-indigo-400/80 rounded-2xl px-4 py-4 shadow-lg shadow-purple-500/30 border border-white/20 text-white">
           <p className="text-xs uppercase tracking-[0.15em] font-semibold opacity-90">
@@ -249,6 +251,7 @@ export const TestResults: React.FC = () => {
               </div>
               
               <form onSubmit={handleAddTest} className="p-6 space-y-5">
+                {formError && <p role="alert" className="text-sm text-rose-300">{formError}</p>}
                 <div>
                   <Input
                     label="Test/Exam Name"
@@ -277,6 +280,8 @@ export const TestResults: React.FC = () => {
                       <Input
                         label="Max Marks"
                         type="number"
+                        min="0.01"
+                        step="any"
                         placeholder="100"
                         value={formData.maxMarks}
                         onChange={(e) => setFormData({...formData, maxMarks: e.target.value})}
@@ -288,6 +293,8 @@ export const TestResults: React.FC = () => {
                       <Input
                         label="Obtained Marks"
                         type="number"
+                        min="0"
+                        step="any"
                         placeholder="85"
                         value={formData.obtainedMarks}
                         onChange={(e) => {
@@ -314,7 +321,7 @@ export const TestResults: React.FC = () => {
                     </div>
                   </div>
                     {/* Real-time percentage calculation with color coding */}
-                  {formData.maxMarks && formData.obtainedMarks && (() => {
+                  {Number(formData.maxMarks) > 0 && formData.obtainedMarks !== '' && (() => {
                     const percentage = Math.round((parseInt(formData.obtainedMarks) / parseInt(formData.maxMarks)) * 100);
                     const getPercentageStyle = (pct: number) => {
                       if (pct >= 90) return 'bg-green-500/20 border-green-400/60 text-green-300';
@@ -423,11 +430,14 @@ export const TestResults: React.FC = () => {
                   </div>
 
                   <div className="space-y-3">
+                    <p className="text-xs text-slate-300">Message preview</p>
+                    <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-xl border border-slate-700 bg-slate-950 p-3 text-xs text-slate-200">{smsService.formatTestResultMessage({ studentName: student.name, testName: selectedTest.testName, subject: selectedTest.subject, obtainedMarks: selectedTest.obtainedMarks, maxMarks: selectedTest.maxMarks, percentage: selectedTest.percentage, date: selectedTest.date, notes: selectedTest.notes })}</pre>
+                    {!Capacitor.isNativePlatform() && <p className="text-xs text-amber-300">SMS sending is available only in the Android app.</p>}
                     <p className="font-semibold text-slate-300 text-center">Send to:</p>                    {parentContacts.map((contact) => (
                       <button
                         key={contact.id}
                         onClick={() => handleSendToParent(selectedTest, contact)}
-                        disabled={sendingMessage}
+                        disabled={sendingMessage || !Capacitor.isNativePlatform()}
                         className="w-full p-4 bg-emerald-500/20 border border-emerald-400/60 hover:bg-emerald-500/30 rounded-xl text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <div className="flex items-center gap-3">

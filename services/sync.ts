@@ -1,0 +1,83 @@
+import { api, post } from './api';
+import { AppBackup, createBackup, restoreBackup, sameBackupData } from './backup';
+const recordKeys = ['tt_students', 'tt_classes', 'tt_payments', 'test_results', 'parent_contacts', 'communications'];
+
+const pendingKey = 'solace_pending_sync';
+let enabled = false;
+let generation = 0;
+let running: Promise<void> | null = null;
+const counts = (backup: AppBackup) => Object.values(backup.data).reduce((sum, records) => sum + records.length, 0);
+const report = (message: string) => window.dispatchEvent(new CustomEvent('solace-sync', { detail: message }));
+
+export class DataConflictError extends Error {
+  constructor(public readonly device: AppBackup, public readonly server: AppBackup) {
+    super('This device has records that differ from the server. No records were changed.');
+  }
+}
+
+
+export async function loadTutorData(): Promise<void> {
+  enabled = false;
+  const remote = await api<AppBackup>('/api/tutor/data');
+  const local = createBackup();
+  if (counts(remote) === 0) {
+    if (counts(local) > 0) {
+      await post('/api/tutor/import', local);
+      report('Existing device records imported to your tutor account.');
+    }
+  } else if (counts(local) > 0 && !sameBackupData(local, remote)) {
+    throw new DataConflictError(local, remote);
+  } else {
+    restoreBackup(remote);
+  }
+  localStorage.removeItem(pendingKey);
+  enabled = true;
+}
+
+export async function useDeviceRecords(backup: AppBackup): Promise<void> {
+  await api('/api/tutor/data', { method: 'PUT', body: JSON.stringify(backup) });
+  localStorage.removeItem(pendingKey);
+  enabled = true;
+  report('Device records copied to the server. Verify all counts before inviting students.');
+}
+
+export function useServerRecords(backup: AppBackup): void {
+  restoreBackup(backup);
+  localStorage.removeItem(pendingKey);
+  enabled = true;
+  report('Server records loaded on this device. Verify the record counts.');
+}
+
+async function flushPending(): Promise<void> {
+  if (running) return running;
+  running = (async () => {
+    while (localStorage.getItem(pendingKey) === '1') {
+      const current = generation;
+      const backup = createBackup();
+      try {
+        await api('/api/tutor/data', { method: 'PUT', body: JSON.stringify(backup) });
+        if (generation === current) localStorage.removeItem(pendingKey);
+        report('All changes saved to your account.');
+      } catch (error) {
+        report(`Changes remain on this device. Server save failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw error;
+      }
+    }
+  })().finally(() => { running = null; });
+  return running;
+}
+
+export function recordChanged(): void {
+  if (!enabled) return;
+  generation += 1;
+  localStorage.setItem(pendingKey, '1');
+  void flushPending().catch(() => {});
+}
+
+export const hasPendingChanges = () => localStorage.getItem(pendingKey) === '1';
+export const retrySync = () => flushPending();
+export async function clearTutorCache(): Promise<void> {
+  if (hasPendingChanges()) await flushPending();
+  enabled = false;
+  for (const key of recordKeys) localStorage.removeItem(key);
+}

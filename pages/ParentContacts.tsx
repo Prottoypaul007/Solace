@@ -8,7 +8,8 @@ import {
   getParentContactsByStudent, 
   addParentContact, 
   updateParentContact,
-  deleteParentContact
+  deleteParentContact,
+  setPrimaryParentContact
 } from '../services/communication';
 import { ParentContact, Student } from '../types';
 import { Plus, Phone, Mail, Edit2, Trash2, Users, Star } from 'lucide-react';
@@ -20,6 +21,7 @@ export const ParentContacts: React.FC = () => {
   const [contacts, setContacts] = useState<ParentContact[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingContact, setEditingContact] = useState<ParentContact | null>(null);
+  const [saveError, setSaveError] = useState('');
   
   const [formData, setFormData] = useState({
     parentName: '',
@@ -56,6 +58,7 @@ export const ParentContacts: React.FC = () => {
     e.preventDefault();
     if (!studentId || !formData.parentName) return;
 
+    try {
     if (editingContact) {
       // Update existing contact
       const updatedContact: ParentContact = {
@@ -79,6 +82,10 @@ export const ParentContacts: React.FC = () => {
 
     resetForm();
     setShowAddModal(false);
+    setSaveError('');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save contact.');
+    }
   };
 
   const handleEdit = (contact: ParentContact) => {
@@ -95,25 +102,28 @@ export const ParentContacts: React.FC = () => {
 
   const handleDelete = (contactId: string) => {
     if (confirm('Are you sure you want to delete this contact?')) {
-      deleteParentContact(contactId);
-      setContacts(prev => prev.filter(contact => contact.id !== contactId));
+      try {
+        deleteParentContact(contactId);
+        setContacts(prev => prev.filter(contact => contact.id !== contactId));
+        setSaveError('');
+      } catch (error) { setSaveError(error instanceof Error ? error.message : 'Could not delete contact.'); }
     }
   };
 
   const handleSetPrimary = (contactId: string) => {
-    setContacts(prev => 
-      prev.map(contact => {
-        const updatedContact = { ...contact, isPrimary: contact.id === contactId };
-        updateParentContact(updatedContact);
-        return updatedContact;
-      })
-    );
+    if (!studentId) return;
+    try {
+      setPrimaryParentContact(studentId, contactId);
+      setContacts(getParentContactsByStudent(studentId));
+      setSaveError('');
+    } catch (error) { setSaveError(error instanceof Error ? error.message : 'Could not update contact.'); }
   };
 
   if (!student) return null;
   return (
     <Layout title={`Parent Contacts - ${student.name}`}>
       <div className="space-y-5">
+        {saveError && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-200">{saveError}</p>}
         
         {/* Hero Section */}
         <section className="bg-gradient-to-r from-emerald-600/80 via-emerald-500/80 to-teal-400/80 rounded-2xl px-4 py-4 shadow-lg shadow-emerald-500/30 border border-white/20 text-white">

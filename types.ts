@@ -12,6 +12,7 @@ export interface ClassSession {
   studentId: string;
   date: string; // ISO string
   durationMinutes: number;
+  rateCharged?: number; // Set for new classes; old records use the student's original rate until edited.
   topic?: string;
 }
 

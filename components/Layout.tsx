@@ -1,12 +1,14 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Users, Settings } from 'lucide-react';
+import { Home, Users, Settings, MessageCircle } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
   title?: string;
   showBack?: boolean;
   onBack?: () => void;
+  studentMode?: boolean;
+  wide?: boolean;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -14,6 +16,8 @@ export const Layout: React.FC<LayoutProps> = ({
   title,
   showBack = false,
   onBack,
+  studentMode = false,
+  wide = false,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,7 +60,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 {title ?? 'Solace'}
               </h1>
               <p className="text-[11px] text-slate-300">
-                Track students, classes & payments in one place
+                {studentMode ? 'Your classes and results' : 'Track students, classes & payments in one place'}
               </p>
             </div>
           </div>
@@ -65,7 +69,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
       {/* Main content */}
       <main className="flex-1 px-5 pb-24 -mt-3">
-        <div className="bg-slate-900/80 border border-white/10 rounded-3xl shadow-2xl shadow-black/50 p-4 backdrop-blur-md max-w-md mx-auto h-[calc(100vh-7.5rem)] overflow-y-auto no-scrollbar">
+        <div className={`bg-slate-900/80 border border-white/10 rounded-3xl shadow-2xl shadow-black/50 p-4 backdrop-blur-md ${wide ? 'max-w-5xl' : 'max-w-md'} mx-auto h-[calc(100vh-7.5rem)] overflow-y-auto no-scrollbar`}>
           {children}
         </div>
       </main>
@@ -74,8 +78,15 @@ export const Layout: React.FC<LayoutProps> = ({
       <nav className="fixed left-0 right-0 bottom-0 z-20">
         <div className="mx-auto max-w-md mb-4 px-4">
           <div className="bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl shadow-black/60 px-6 py-2 flex items-center justify-between backdrop-blur-lg">
+            {studentMode && <button onClick={() => navigate('/student-home')} className={navButtonClasses(isActive('/student-home'))}>
+              <div className={iconWrapperClasses(isActive('/student-home'))}><Home size={20} /></div><span className="font-medium">Home</span>
+            </button>}
+
+            <button onClick={() => navigate('/connect')} className={navButtonClasses(isActive('/connect'))}>
+              <div className={iconWrapperClasses(isActive('/connect'))}><MessageCircle size={20} /></div><span className="font-medium">Connect</span>
+            </button>
             {/* Home */}
-            <button
+            {!studentMode && <button
               onClick={() => navigate('/')}
               className={navButtonClasses(isActive('/'))}
             >
@@ -83,10 +94,10 @@ export const Layout: React.FC<LayoutProps> = ({
                 <Home size={20} strokeWidth={isActive('/') ? 2.5 : 2} />
               </div>
               <span className="font-medium">Home</span>
-            </button>
+            </button>}
 
             {/* Students */}
-            <button
+            {!studentMode && <button
               onClick={() => navigate('/students')}
               className={navButtonClasses(isActive('/students') || location.pathname.startsWith('/student'))}
             >
@@ -106,16 +117,17 @@ export const Layout: React.FC<LayoutProps> = ({
                 />
               </div>
               <span className="font-medium">Students</span>
-            </button>
+            </button>}
 
-            {/* Settings placeholder */}
+            {/* Backup and restore */}
             <button
-              className="flex flex-col items-center justify-center gap-0.5 text-[11px] text-slate-500 cursor-not-allowed"
+              onClick={() => navigate(studentMode ? '/student-account' : '/settings')}
+              className={navButtonClasses(isActive(studentMode ? '/student-account' : '/settings'))}
             >
-              <div className="h-9 w-9 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10">
+              <div className={iconWrapperClasses(isActive(studentMode ? '/student-account' : '/settings'))}>
                 <Settings size={20} />
               </div>
-              <span className="font-medium">Soon</span>
+              <span className="font-medium">{studentMode ? 'Account' : 'Settings'}</span>
             </button>
           </div>
         </div>

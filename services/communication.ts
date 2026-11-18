@@ -1,6 +1,8 @@
 import { TestResult, ParentContact, Communication } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { smsService } from './sms';
+import { DATA_KEYS, readList, writeBatch, writeList } from './dataStore';
+import { validateTestMarks } from './validation';
 
 // Storage keys
 const TEST_RESULTS_KEY = 'test_results';
@@ -9,6 +11,7 @@ const COMMUNICATIONS_KEY = 'communications';
 
 // Test Results Management
 export const addTestResult = (testResult: Omit<TestResult, 'id' | 'percentage'>): TestResult => {
+  validateTestMarks(testResult.maxMarks, testResult.obtainedMarks);
   const percentage = Math.round((testResult.obtainedMarks / testResult.maxMarks) * 100);
   const newTestResult: TestResult = {
     ...testResult,
@@ -18,14 +21,11 @@ export const addTestResult = (testResult: Omit<TestResult, 'id' | 'percentage'>)
   
   const results = getTestResults();
   results.push(newTestResult);
-  localStorage.setItem(TEST_RESULTS_KEY, JSON.stringify(results));
+  writeList(TEST_RESULTS_KEY, results);
   return newTestResult;
 };
 
-export const getTestResults = (): TestResult[] => {
-  const data = localStorage.getItem(TEST_RESULTS_KEY);
-  return data ? JSON.parse(data) : [];
-};
+export const getTestResults = (): TestResult[] => readList<TestResult>(TEST_RESULTS_KEY);
 
 export const getTestResultsByStudent = (studentId: string): TestResult[] => {
   return getTestResults().filter(result => result.studentId === studentId);
@@ -36,13 +36,13 @@ export const updateTestResult = (testResult: TestResult): void => {
   const index = results.findIndex(r => r.id === testResult.id);
   if (index !== -1) {
     results[index] = testResult;
-    localStorage.setItem(TEST_RESULTS_KEY, JSON.stringify(results));
+    writeList(TEST_RESULTS_KEY, results);
   }
 };
 
 export const deleteTestResult = (id: string): void => {
   const results = getTestResults().filter(r => r.id !== id);
-  localStorage.setItem(TEST_RESULTS_KEY, JSON.stringify(results));
+  writeList(TEST_RESULTS_KEY, results);
 };
 
 // Parent Contacts Management
@@ -54,14 +54,11 @@ export const addParentContact = (contact: Omit<ParentContact, 'id'>): ParentCont
   
   const contacts = getParentContacts();
   contacts.push(newContact);
-  localStorage.setItem(PARENT_CONTACTS_KEY, JSON.stringify(contacts));
+  writeList(PARENT_CONTACTS_KEY, contacts);
   return newContact;
 };
 
-export const getParentContacts = (): ParentContact[] => {
-  const data = localStorage.getItem(PARENT_CONTACTS_KEY);
-  return data ? JSON.parse(data) : [];
-};
+export const getParentContacts = (): ParentContact[] => readList<ParentContact>(PARENT_CONTACTS_KEY);
 
 export const getParentContactsByStudent = (studentId: string): ParentContact[] => {
   return getParentContacts().filter(contact => contact.studentId === studentId);
@@ -72,13 +69,19 @@ export const updateParentContact = (contact: ParentContact): void => {
   const index = contacts.findIndex(c => c.id === contact.id);
   if (index !== -1) {
     contacts[index] = contact;
-    localStorage.setItem(PARENT_CONTACTS_KEY, JSON.stringify(contacts));
+    writeList(PARENT_CONTACTS_KEY, contacts);
   }
 };
 
 export const deleteParentContact = (id: string): void => {
   const contacts = getParentContacts().filter(c => c.id !== id);
-  localStorage.setItem(PARENT_CONTACTS_KEY, JSON.stringify(contacts));
+  writeList(PARENT_CONTACTS_KEY, contacts);
+};
+
+export const setPrimaryParentContact = (studentId: string, contactId: string): void => {
+  writeList(PARENT_CONTACTS_KEY, getParentContacts().map(contact =>
+    contact.studentId === studentId ? { ...contact, isPrimary: contact.id === contactId } : contact
+  ));
 };
 
 // Communication Management
@@ -153,23 +156,38 @@ export const sendTestResultToParent = async (
   // Save communication
   const communications = getCommunications();
   communications.push(communication);
-  localStorage.setItem(COMMUNICATIONS_KEY, JSON.stringify(communications));
-
-  // Update test result as sent only if SMS was successful
-  if (communication.status === 'sent') {
-    updateTestResult({ ...testResult, sentToParent: true, sentDate: communication.sentDate });
+  try {
+    if (communication.status === 'sent') {
+      writeBatch({
+        [COMMUNICATIONS_KEY]: communications,
+        [TEST_RESULTS_KEY]: getTestResults().map(result => result.id === testResult.id
+          ? { ...result, sentToParent: true, sentDate: communication.sentDate } : result),
+      });
+    } else {
+      writeList(COMMUNICATIONS_KEY, communications);
+    }
+  } catch (error) {
+    if (communication.status === 'sent') {
+      throw new Error('Android accepted the SMS, but Solace could not save its history. Check the recipient before trying again.');
+    }
+    throw error;
   }
 
   return communication;
 };
 
-export const getCommunications = (): Communication[] => {
-  const data = localStorage.getItem(COMMUNICATIONS_KEY);
-  return data ? JSON.parse(data) : [];
-};
+export const getCommunications = (): Communication[] => readList<Communication>(COMMUNICATIONS_KEY);
 
 export const getCommunicationsByStudent = (studentId: string): Communication[] => {
   return getCommunications().filter(comm => comm.studentId === studentId);
+};
+
+export const deleteStudentCommunicationData = (studentId: string): void => {
+  writeBatch({
+    [DATA_KEYS.testResults]: getTestResults().filter(result => result.studentId !== studentId),
+    [DATA_KEYS.parentContacts]: getParentContacts().filter(contact => contact.studentId !== studentId),
+    [DATA_KEYS.communications]: getCommunications().filter(comm => comm.studentId !== studentId),
+  });
 };
 
 export const getUnsentTestResults = (): TestResult[] => {

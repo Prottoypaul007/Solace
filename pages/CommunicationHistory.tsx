@@ -70,7 +70,7 @@ export const CommunicationHistory: React.FC = () => {
           </p>
           <h2 className="mt-1 text-lg font-semibold">{student.name}'s Messages</h2>
           <p className="mt-1 text-[11px] opacity-90">
-            View all sent SMS messages and communication history.
+            View SMS attempts. Sent means Android accepted the send request; delivery is not confirmed.
           </p>
         </section>
 

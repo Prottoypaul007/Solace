@@ -1,91 +1,94 @@
-import { Student, ClassSession, Payment } from '../types';
+import { Student, ClassSession, Payment, TestResult, ParentContact, Communication } from '../types';
+import { DATA_KEYS, readList, writeBatch, writeList } from './dataStore';
 
-const KEYS = {
-  STUDENTS: 'tt_students',
-  CLASSES: 'tt_classes',
-  PAYMENTS: 'tt_payments'
-};
-
-// Helpers
-const getList = <T>(key: string): T[] => {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    console.error(`Error reading ${key}`, e);
-    return [];
+export const getStudents = (): Student[] => readList<Student>(DATA_KEYS.students);
+export const getStudentById = (id: string): Student | undefined => getStudents().find(student => student.id === id);
+export const addStudent = (student: Student): void => writeList(DATA_KEYS.students, [...getStudents(), student]);
+export const updateStudent = (student: Student): void => {
+  const students = getStudents();
+  const previous = students.find(item => item.id === student.id);
+  if (!previous) throw new Error('Student not found.');
+  const updatedStudents = students.map(item => item.id === student.id ? student : item);
+  if (previous.ratePerClass !== student.ratePerClass) {
+    const updatedClasses = getClasses().map(item => item.studentId === student.id && item.rateCharged === undefined
+      ? { ...item, rateCharged: previous.ratePerClass } : item);
+    writeBatch({ [DATA_KEYS.students]: updatedStudents, [DATA_KEYS.classes]: updatedClasses });
+  } else {
+    writeList(DATA_KEYS.students, updatedStudents);
   }
 };
 
-const saveList = <T>(key: string, list: T[]): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(list));
-  } catch (e) {
-    console.error(`Error saving ${key}`, e);
-  }
+export interface StudentSnapshot {
+  student: Student;
+  classes: ClassSession[];
+  payments: Payment[];
+  testResults: TestResult[];
+  parentContacts: ParentContact[];
+  communications: Communication[];
+}
+
+export const getStudentSnapshot = (id: string): StudentSnapshot => {
+  const student = getStudentById(id);
+  if (!student) throw new Error('Student not found.');
+  return {
+    student,
+    classes: getClassesByStudent(id),
+    payments: getPaymentsByStudent(id),
+    testResults: readList<TestResult>(DATA_KEYS.testResults).filter(item => item.studentId === id),
+    parentContacts: readList<ParentContact>(DATA_KEYS.parentContacts).filter(item => item.studentId === id),
+    communications: readList<Communication>(DATA_KEYS.communications).filter(item => item.studentId === id),
+  };
 };
 
-// Student Operations
-export const getStudents = (): Student[] => getList<Student>(KEYS.STUDENTS);
-
-export const addStudent = (student: Student): void => {
-  const list = getStudents();
-  list.push(student);
-  saveList(KEYS.STUDENTS, list);
+export const deleteStudent = (id: string): StudentSnapshot => {
+  const snapshot = getStudentSnapshot(id);
+  writeBatch({
+    [DATA_KEYS.students]: getStudents().filter(item => item.id !== id),
+    [DATA_KEYS.classes]: getClasses().filter(item => item.studentId !== id),
+    [DATA_KEYS.payments]: getPayments().filter(item => item.studentId !== id),
+    [DATA_KEYS.testResults]: readList<TestResult>(DATA_KEYS.testResults).filter(item => item.studentId !== id),
+    [DATA_KEYS.parentContacts]: readList<ParentContact>(DATA_KEYS.parentContacts).filter(item => item.studentId !== id),
+    [DATA_KEYS.communications]: readList<Communication>(DATA_KEYS.communications).filter(item => item.studentId !== id),
+  });
+  return snapshot;
 };
 
-export const deleteStudent = (id: string): void => {
-  const students = getStudents().filter(s => s.id !== id);
-  saveList(KEYS.STUDENTS, students);
-  
-  // Cleanup related data
-  const classes = getClasses().filter(c => c.studentId !== id);
-  saveList(KEYS.CLASSES, classes);
-  
-  const payments = getPayments().filter(p => p.studentId !== id);
-  saveList(KEYS.PAYMENTS, payments);
+export const restoreStudent = (snapshot: StudentSnapshot): void => {
+  const id = snapshot.student.id;
+  if (getStudentById(id)) throw new Error('This student already exists.');
+  writeBatch({
+    [DATA_KEYS.students]: [...getStudents(), snapshot.student],
+    [DATA_KEYS.classes]: [...getClasses(), ...snapshot.classes],
+    [DATA_KEYS.payments]: [...getPayments(), ...snapshot.payments],
+    [DATA_KEYS.testResults]: [...readList<TestResult>(DATA_KEYS.testResults), ...snapshot.testResults],
+    [DATA_KEYS.parentContacts]: [...readList<ParentContact>(DATA_KEYS.parentContacts), ...snapshot.parentContacts],
+    [DATA_KEYS.communications]: [...readList<Communication>(DATA_KEYS.communications), ...snapshot.communications],
+  });
 };
 
-export const getStudentById = (id: string): Student | undefined => {
-  return getStudents().find(s => s.id === id);
+export const getClasses = (): ClassSession[] => readList<ClassSession>(DATA_KEYS.classes);
+export const getClassesByStudent = (studentId: string): ClassSession[] => getClasses().filter(item => item.studentId === studentId);
+export const addClassSession = (session: ClassSession): void => writeList(DATA_KEYS.classes, [...getClasses(), session]);
+export const updateClassSession = (session: ClassSession): void => {
+  const classes = getClasses();
+  if (!classes.some(item => item.id === session.id)) throw new Error('Class not found.');
+  writeList(DATA_KEYS.classes, classes.map(item => item.id === session.id ? session : item));
 };
+export const deleteClassSession = (id: string): void => writeList(DATA_KEYS.classes, getClasses().filter(item => item.id !== id));
 
-// Class Operations
-export const getClasses = (): ClassSession[] => getList<ClassSession>(KEYS.CLASSES);
-
-export const getClassesByStudent = (studentId: string): ClassSession[] => {
-  return getClasses().filter(c => c.studentId === studentId);
+export const getPayments = (): Payment[] => readList<Payment>(DATA_KEYS.payments);
+export const getPaymentsByStudent = (studentId: string): Payment[] => getPayments().filter(item => item.studentId === studentId);
+export const addPayment = (payment: Payment): void => writeList(DATA_KEYS.payments, [...getPayments(), payment]);
+export const updatePayment = (payment: Payment): void => {
+  const payments = getPayments();
+  if (!payments.some(item => item.id === payment.id)) throw new Error('Payment not found.');
+  writeList(DATA_KEYS.payments, payments.map(item => item.id === payment.id ? payment : item));
 };
+export const deletePayment = (id: string): void => writeList(DATA_KEYS.payments, getPayments().filter(item => item.id !== id));
 
-export const addClassSession = (session: ClassSession): void => {
-  const list = getClasses();
-  list.push(session);
-  saveList(KEYS.CLASSES, list);
-};
-
-// Payment Operations
-export const getPayments = (): Payment[] => getList<Payment>(KEYS.PAYMENTS);
-
-export const getPaymentsByStudent = (studentId: string): Payment[] => {
-  return getPayments().filter(p => p.studentId === studentId);
-};
-
-export const addPayment = (payment: Payment): void => {
-  const list = getPayments();
-  list.push(payment);
-  saveList(KEYS.PAYMENTS, list);
-};
-
-// Statistics
 export const getStudentBalance = (studentId: string): number => {
   const student = getStudentById(studentId);
   if (!student) return 0;
-
-  const classes = getClassesByStudent(studentId);
-  const payments = getPaymentsByStudent(studentId);
-
-  const totalEarned = classes.length * student.ratePerClass;
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-
-  return totalEarned - totalPaid;
+  return getClassesByStudent(studentId).reduce((sum, session) => sum + (session.rateCharged ?? student.ratePerClass), 0) -
+    getPaymentsByStudent(studentId).reduce((sum, payment) => sum + payment.amount, 0);
 };

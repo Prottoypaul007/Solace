@@ -19,6 +19,7 @@ export const AddStudent: React.FC = () => {
     subject: '',
     rate: '',
   });
+  const [saveError, setSaveError] = useState('');
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -32,24 +33,27 @@ export const AddStudent: React.FC = () => {
     e.preventDefault();
 
     const newErrors = {
-      name: formData.name ? '' : 'Student name is required',
-      subject: formData.subject ? '' : 'Subject is required',
-      rate: formData.rate ? '' : 'Rate per class is required',
+      name: formData.name.trim() ? '' : 'Student name is required',
+      subject: formData.subject.trim() ? '' : 'Subject is required',
+      rate: Number.isFinite(Number(formData.rate)) && Number(formData.rate) > 0 ? '' : 'Enter a rate greater than zero',
     };
     setErrors(newErrors);
 
     if (newErrors.name || newErrors.subject || newErrors.rate) return;
 
-    addStudent({
-      id: uuidv4(),
-      name: formData.name.trim(),
-      subject: formData.subject.trim(),
-      ratePerClass: Number(formData.rate),
-      phone: formData.phone.trim(),
-      createdAt: new Date().toISOString(),
-    });
-
-    navigate('/students');
+    try {
+      addStudent({
+        id: uuidv4(),
+        name: formData.name.trim(),
+        subject: formData.subject.trim(),
+        ratePerClass: Number(formData.rate),
+        phone: formData.phone.trim(),
+        createdAt: new Date().toISOString(),
+      });
+      navigate('/students');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save student.');
+    }
   };
 
   return (
@@ -87,6 +91,7 @@ export const AddStudent: React.FC = () => {
         </div>
 
         <div className="space-y-2">
+          {saveError && <p role="alert" className="text-sm text-rose-300">{saveError}</p>}
           <Button type="submit" fullWidth size="md">
             Save student
           </Button>
