@@ -74,3 +74,22 @@ test('first import preserves orphan records as recoverable students', async () =
     assert.equal(JSON.parse(values.get('tt_students'))[0].id, 'missing-2');
   } finally { globalThis.fetch = previousFetch; }
 });
+
+test('a second teacher cannot automatically import another teacher’s phone cache', async () => {
+  values.clear();
+  values.set('tt_students', JSON.stringify([student]));
+  values.set('solace_tutor_cache_owner', 'first-teacher');
+  values.set('solace_pending_sync', '1');
+  const previousFetch = globalThis.fetch;
+  const methods = [];
+  globalThis.fetch = async (_url, options = {}) => {
+    methods.push(options.method || 'GET');
+    return new Response(JSON.stringify(backup([])), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    await assert.rejects(sync.loadTutorData('second-teacher'), error => error instanceof sync.DataConflictError);
+    assert.deepEqual(methods, ['GET']);
+    assert.deepEqual(JSON.parse(values.get('tt_students')), [student]);
+    assert.equal(values.get('solace_pending_sync'), '1');
+  } finally { globalThis.fetch = previousFetch; }
+});

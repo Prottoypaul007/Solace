@@ -1,12 +1,12 @@
 import { apiBase } from './api';
 
-export interface Conversation { studentId: string; studentName: string; conversationId: string | null; latestMessage: string | null; latestAt: string | null; unreadCount: number }
+export interface Conversation { studentId: string; studentName: string; teacherName?: string; conversationId: string | null; latestMessage: string | null; latestAt: string | null; unreadCount: number }
 export interface ChatMessage { id: string; senderAccountId: string; body: string; createdAt: string; readAt: string | null }
-export interface Announcement { id: string; title: string; body: string; created_at: string; updated_at: string; readAt?: string | null; recipientCount?: number; readCount?: number }
-export interface Homework { id: string; title: string; description: string; class_id: string | null; deadline: string | null; created_at: string; completedAt?: string | null; recipientCount?: number; completedCount?: number; attachments: Attachment[] }
+export interface Announcement { id: string; title: string; body: string; studentId?: string; teacherName?: string; created_at: string; updated_at: string; readAt?: string | null; recipientCount?: number; readCount?: number }
+export interface Homework { id: string; title: string; description: string; studentId?: string; teacherName?: string; class_id: string | null; deadline: string | null; created_at: string; completedAt?: string | null; recipientCount?: number; completedCount?: number; attachments: Attachment[] }
 export interface Attachment { id: string; name: string; mime: string; size: number }
-export interface ScheduledClass { id: string; student_id: string; studentName: string; start_at: string; subject: string; reminder_minutes: number }
-export interface Notice { id: string; type: 'MESSAGE' | 'ANNOUNCEMENT' | 'HOMEWORK' | 'CLASS_REMINDER'; resourceId: string; createdAt: string; readAt: string | null }
+export interface ScheduledClass { id: string; student_id: string; studentName: string; teacherName?: string; start_at: string; subject: string; reminder_minutes: number }
+export interface Notice { id: string; type: 'MESSAGE' | 'ANNOUNCEMENT' | 'HOMEWORK' | 'CLASS_REMINDER'; resourceId: string; studentId?: string; teacherName?: string; createdAt: string; readAt: string | null }
 export interface StudentChoice { id: string; name: string; subject: string }
 
 export const liveEvents = (onEvent: (value: {type: string; studentId?: string}) => void) => {

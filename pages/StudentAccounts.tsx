@@ -7,7 +7,7 @@ import { api, post } from '../services/api';
 import { retrySync } from '../services/sync';
 import { isRecoveredStudent } from '../services/recoveredStudents';
 
-interface LinkedAccount { id: string; studentId: string; email: string; status: 'PENDING' | 'ACTIVE' | 'DISABLED'; studentName: string }
+interface LinkedAccount { id: string; studentId: string; email: string; status: 'PENDING' | 'ACTIVE' | 'DISABLED'; studentName: string; shared?: boolean }
 interface TutorData { data: { students: Student[] } }
 export const StudentAccounts: React.FC = () => {
   const navigate = useNavigate();
@@ -39,7 +39,7 @@ export const StudentAccounts: React.FC = () => {
   });
   const action = (account: LinkedAccount, value: 'disable' | 'reactivate') => run(async () => {
     await post(`/api/tutor/accounts/${encodeURIComponent(account.id)}/${value}`);
-    setNotice(value === 'disable' ? 'Account disabled and sessions revoked.' : 'Account reactivated.');
+    setNotice(value === 'disable' ? 'This teacher link was disabled.' : 'This teacher link was restored.');
   });
   return <Layout title="Student accounts"><div className="space-y-4 pb-4">
     <p className="text-sm text-slate-300">Enable login for an existing student, then share their invitation link privately.</p>
@@ -47,9 +47,10 @@ export const StudentAccounts: React.FC = () => {
       <div><h2 className="font-semibold">{student.name}</h2><p className="text-xs text-slate-300">{account ? `${account.email} · ${account.status.toLowerCase()}` : 'Login not enabled'}</p></div>
       {!account?.status || account.status === 'PENDING' ? <><input className="w-full bg-slate-900 rounded-xl p-3 text-sm" type="email" placeholder="Student email" value={emails[student.id] ?? account?.email ?? ''} onChange={e => setEmails(prev => ({ ...prev, [student.id]: e.target.value }))} />
       <button disabled={busy} className="rounded-xl bg-blue-600 px-4 py-2 text-sm disabled:opacity-50" onClick={() => invite(student)}>{account ? 'Resend invitation' : 'Enable student login'}</button></> : null}
-      {account?.status === 'ACTIVE' && <button disabled={busy} className="rounded-xl border border-rose-400/50 px-4 py-2 text-sm" onClick={() => action(account, 'disable')}>Disable account</button>}
-      {account?.status === 'DISABLED' && <button disabled={busy} className="rounded-xl border border-blue-400/50 px-4 py-2 text-sm" onClick={() => action(account, 'reactivate')}>Reactivate account</button>}
-      {account && account.status !== 'PENDING' && <div className="space-y-2"><input className="w-full bg-slate-900 rounded-xl p-3 text-sm" type="email" aria-label={`Email for ${student.name}`} value={emails[student.id] ?? account.email} onChange={e => setEmails(prev => ({ ...prev, [student.id]: e.target.value }))} /><button disabled={busy || (emails[student.id] ?? account.email) === account.email} className="text-blue-300 text-sm disabled:opacity-40" onClick={() => run(async () => { await api(`/api/tutor/accounts/${encodeURIComponent(account.id)}`, { method: 'PATCH', body: JSON.stringify({ email: emails[student.id] }) }); setNotice('Email updated. Existing sessions were revoked.'); })}>Update email</button></div>}
+      {account?.status === 'ACTIVE' && <button disabled={busy} className="rounded-xl border border-rose-400/50 px-4 py-2 text-sm" onClick={() => action(account, 'disable')}>Remove this teacher's access</button>}
+      {account?.status === 'DISABLED' && <button disabled={busy} className="rounded-xl border border-blue-400/50 px-4 py-2 text-sm" onClick={() => action(account, 'reactivate')}>Restore this teacher's access</button>}
+      {account?.shared && <p className="text-xs text-slate-400">This student also uses another teacher. Their account email is shared across teachers.</p>}
+      {account && account.status !== 'PENDING' && !account.shared && <div className="space-y-2"><input className="w-full bg-slate-900 rounded-xl p-3 text-sm" type="email" aria-label={`Email for ${student.name}`} value={emails[student.id] ?? account.email} onChange={e => setEmails(prev => ({ ...prev, [student.id]: e.target.value }))} /><button disabled={busy || (emails[student.id] ?? account.email) === account.email} className="text-blue-300 text-sm disabled:opacity-40" onClick={() => run(async () => { await api(`/api/tutor/accounts/${encodeURIComponent(account.id)}`, { method: 'PATCH', body: JSON.stringify({ email: emails[student.id] }) }); setNotice('Email updated. Existing sessions were revoked.'); })}>Update email</button></div>}
       {links[student.id] && <div className="space-y-2"><input readOnly aria-label="Activation link" className="w-full bg-slate-900 rounded-xl p-2 text-xs" value={links[student.id]} /><button className="text-blue-300 text-sm" onClick={() => void navigator.clipboard.writeText(links[student.id]).then(() => setNotice('Link copied.'))}>Copy link</button></div>}
     </section>; })}
     {error && <div role="alert" className="space-y-2"><p className="text-sm text-rose-300">{error}</p>{error.includes('missing student reference') && <button className="min-h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold" onClick={() => navigate('/settings')}>Repair imported records in Settings</button>}</div>}{notice && <p role="status" className="text-sm text-emerald-300">{notice}</p>}

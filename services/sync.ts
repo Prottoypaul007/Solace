@@ -3,6 +3,7 @@ import { AppBackup, createBackup, missingStudentReferences, recoverMissingStuden
 const recordKeys = ['tt_students', 'tt_classes', 'tt_payments', 'test_results', 'parent_contacts', 'communications'];
 
 const pendingKey = 'solace_pending_sync';
+const cacheOwnerKey = 'solace_tutor_cache_owner';
 let enabled = false;
 let generation = 0;
 let running: Promise<void> | null = null;
@@ -16,10 +17,17 @@ export class DataConflictError extends Error {
 }
 
 
-export async function loadTutorData(): Promise<void> {
+export async function loadTutorData(accountId?: string): Promise<void> {
   enabled = false;
   const remote = await api<AppBackup>('/api/tutor/data');
   const local = createBackup();
+  const previousOwner = localStorage.getItem(cacheOwnerKey);
+  if (accountId && previousOwner && previousOwner !== accountId && counts(local) > 0) {
+    throw new DataConflictError(local, remote);
+  }
+  if (accountId && !previousOwner && counts(remote) === 0 && counts(local) > 0) {
+    throw new DataConflictError(local, remote);
+  }
   if (counts(remote) === 0) {
     if (counts(local) > 0) {
       const recovered = recoverMissingStudents(local);
@@ -33,14 +41,16 @@ export async function loadTutorData(): Promise<void> {
     restoreBackup(remote);
   }
   localStorage.removeItem(pendingKey);
+  if (accountId) localStorage.setItem(cacheOwnerKey, accountId);
   enabled = true;
 }
 
-export async function useDeviceRecords(backup: AppBackup): Promise<void> {
+export async function useDeviceRecords(backup: AppBackup, accountId?: string): Promise<void> {
   const recovered = recoverMissingStudents(backup);
   await api('/api/tutor/data', { method: 'PUT', body: JSON.stringify(recovered) });
   if (recovered !== backup) restoreBackup(recovered);
   localStorage.removeItem(pendingKey);
+  if (accountId) localStorage.setItem(cacheOwnerKey, accountId);
   enabled = true;
   report('Device records copied to the server. Verify all counts before inviting students.');
 }
@@ -59,9 +69,10 @@ export async function repairImportedRecords(): Promise<number> {
   return missing.length;
 }
 
-export function useServerRecords(backup: AppBackup): void {
+export function useServerRecords(backup: AppBackup, accountId?: string): void {
   restoreBackup(backup);
   localStorage.removeItem(pendingKey);
+  if (accountId) localStorage.setItem(cacheOwnerKey, accountId);
   enabled = true;
   report('Server records loaded on this device. Verify the record counts.');
 }
@@ -98,4 +109,5 @@ export async function clearTutorCache(): Promise<void> {
   if (hasPendingChanges()) await flushPending();
   enabled = false;
   for (const key of recordKeys) localStorage.removeItem(key);
+  localStorage.removeItem(cacheOwnerKey);
 }

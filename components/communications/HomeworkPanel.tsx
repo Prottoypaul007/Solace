@@ -9,7 +9,7 @@ const fileBase64 = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader(); reader.onerror = () => reject(new Error('Could not read attachment.'));
   reader.onload = () => resolve(String(reader.result).split(',')[1] || ''); reader.readAsDataURL(file);
 });
-export const HomeworkPanel: React.FC<{ revision: number; students: StudentChoice[] }> = ({ revision, students }) => {
+export const HomeworkPanel: React.FC<{ revision: number; students: StudentChoice[]; teacherFilter?: string }> = ({ revision, students, teacherFilter = '' }) => {
   const { account } = useAuth();
   const tutor = account?.role === 'TUTOR';
   const [rows, setRows] = useState<Homework[]>([]);
@@ -63,11 +63,11 @@ export const HomeworkPanel: React.FC<{ revision: number; students: StudentChoice
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load status.'); }
   };
   return <div className="grid md:grid-cols-[1fr_18rem] gap-4"><div className="space-y-3"><h2 className="font-semibold">Homework</h2>
-    {!rows.length && <p className="text-sm text-slate-400">No homework assigned yet.</p>}
-    {rows.map(row => { const overdue = Boolean(row.deadline && Date.parse(row.deadline) < Date.now() && !row.completedAt); return <article key={row.id} className="rounded-2xl bg-slate-800/60 border border-white/10 p-4 space-y-2">
+    {!rows.filter(row => !teacherFilter || row.studentId === teacherFilter).length && <p className="text-sm text-slate-400">No homework assigned yet.</p>}
+    {rows.filter(row => !teacherFilter || row.studentId === teacherFilter).map(row => { const overdue = Boolean(row.deadline && Date.parse(row.deadline) < Date.now() && !row.completedAt); return <article key={row.id} className="rounded-2xl bg-slate-800/60 border border-white/10 p-4 space-y-2">
       <div className="flex justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className={`text-xs ${overdue ? 'text-amber-300' : 'text-slate-300'}`}>{tutor ? `${row.completedCount}/${row.recipientCount} completed` : row.completedAt ? 'Completed' : overdue ? 'Overdue' : 'Assigned'}</span></div>
       <p className="text-sm whitespace-pre-wrap">{row.description}</p>
-      <p className="text-xs text-slate-400">Assigned {formatDhaka(row.created_at)}{row.deadline && ` · Due ${formatDhaka(row.deadline)} (Dhaka)`}</p>
+      <p className="text-xs text-slate-400">Assigned {formatDhaka(row.created_at)}{row.deadline && ` · Due ${formatDhaka(row.deadline)} (Dhaka)`}{!tutor && row.teacherName && ` · ${row.teacherName}`}</p>
       {!!row.attachments.length && <div className="space-y-1">{row.attachments.map(file => <button key={file.id} className="block text-sm text-blue-300" onClick={() => void downloadAttachment(file.id, file.name).catch(e => setError(e.message))}>Download {file.name}</button>)}</div>}
       {tutor ? <div className="space-x-3"><button className="text-blue-300 text-sm" onClick={() => void showCompletion(row.id)}>View completion</button><button className="text-blue-300 text-sm" onClick={() => void edit(row).catch(e => setError(e.message))}>Edit</button><button className="text-rose-300 text-sm" onClick={() => void remove(row.id)}>Delete</button></div> : !row.completedAt && <button className="text-blue-300 text-sm" onClick={() => void complete(row.id)}>Mark completed</button>}
       {completion[row.id] && <div className="text-xs text-slate-300">{completion[row.id].map(item => <p key={item.studentId}>{item.studentName}: {item.completedAt ? `Completed ${new Date(item.completedAt).toLocaleString()}` : 'Assigned'}</p>)}</div>}

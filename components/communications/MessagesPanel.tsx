@@ -3,7 +3,7 @@ import { useAuth } from '../AuthProvider';
 import { api, post } from '../../services/api';
 import { ChatMessage, Conversation } from '../../services/communications';
 
-export const MessagesPanel: React.FC<{ revision: number; focusStudent: string }> = ({ revision, focusStudent }) => {
+export const MessagesPanel: React.FC<{ revision: number; focusStudent: string; teacherFilter?: string }> = ({ revision, focusStudent, teacherFilter = '' }) => {
   const { account } = useAuth();
   const [list, setList] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState('');
@@ -15,7 +15,7 @@ export const MessagesPanel: React.FC<{ revision: number; focusStudent: string }>
   const nonce = useRef<{ body: string; value: string } | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const refreshList = () => api<Conversation[]>('/api/conversations').then(rows => {
-    setList(rows); setSelected(current => current || rows[0]?.studentId || '');
+    setList(rows); setSelected(current => rows.some(row => row.studentId === current) ? current : rows[0]?.studentId || '');
   }).catch(e => setError(e.message));
   const refreshMessages = async (studentId: string) => {
     const result = await api<{messages:ChatMessage[];nextCursor:string|null}>(`/api/conversations/${encodeURIComponent(studentId)}/messages`);
@@ -27,6 +27,7 @@ export const MessagesPanel: React.FC<{ revision: number; focusStudent: string }>
   };
   useEffect(() => { void refreshList(); }, [revision]);
   useEffect(() => { if (focusStudent) setSelected(focusStudent); }, [focusStudent]);
+  useEffect(() => { if (teacherFilter) setSelected(teacherFilter); }, [teacherFilter]);
   useEffect(() => { if (selected) void refreshMessages(selected).catch(e => setError(e.message)); }, [selected, revision]);
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length, selected]);
   const older = async () => {
@@ -47,23 +48,24 @@ export const MessagesPanel: React.FC<{ revision: number; focusStudent: string }>
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Message was not sent. Try again.'); }
     finally { setBusy(false); }
   };
-  const active = list.find(item => item.studentId === selected);
+  const visibleList = teacherFilter ? list.filter(item => item.studentId === teacherFilter) : list;
+  const active = visibleList.find(item => item.studentId === selected);
   return <div className="grid md:grid-cols-[15rem_1fr] gap-4 min-h-[30rem]">
     <aside className="rounded-2xl bg-slate-800/60 p-2 max-h-[34rem] overflow-y-auto"><h2 className="font-semibold px-2 py-1">Conversations</h2>
-      {list.length ? list.map(item => <button key={item.studentId} onClick={() => setSelected(item.studentId)} className={`w-full rounded-xl p-3 text-left ${selected === item.studentId ? 'bg-blue-600/30' : 'hover:bg-white/5'}`}>
-        <span className="flex justify-between gap-2 text-sm font-medium"><span>{item.studentName}</span>{item.unreadCount > 0 && <span className="rounded-full bg-blue-500 px-2 text-xs">{item.unreadCount}</span>}</span>
+      {visibleList.length ? visibleList.map(item => <button key={item.studentId} onClick={() => setSelected(item.studentId)} className={`w-full rounded-xl p-3 text-left ${selected === item.studentId ? 'bg-blue-600/30' : 'hover:bg-white/5'}`}>
+        <span className="flex justify-between gap-2 text-sm font-medium"><span>{account?.role === 'STUDENT' ? item.teacherName || 'Teacher' : item.studentName}</span>{item.unreadCount > 0 && <span className="rounded-full bg-blue-500 px-2 text-xs">{item.unreadCount}</span>}</span>
         <span className="block text-xs text-slate-300 truncate mt-1">{item.latestMessage || 'No messages yet'}</span>
         {item.latestAt && <time className="text-[11px] text-slate-400">{new Date(item.latestAt).toLocaleString()}</time>}
       </button>) : <p className="p-3 text-sm text-slate-400">No students available.</p>}
     </aside>
     <section className="rounded-2xl bg-slate-800/40 border border-white/10 flex flex-col min-h-[30rem] max-h-[34rem]">
-      <h2 className="p-3 border-b border-white/10 font-semibold">{active?.studentName || 'Select a conversation'}</h2>
+      <h2 className="p-3 border-b border-white/10 font-semibold">{account?.role === 'STUDENT' ? active?.teacherName || 'Select a teacher' : active?.studentName || 'Select a conversation'}</h2>
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {cursor && <button onClick={older} className="text-sm text-blue-300 w-full">Load older messages</button>}
         {selected && !messages.length && <p className="text-sm text-slate-400 text-center py-8">Start the conversation.</p>}
         {messages.map(item => <div key={item.id} className={`flex ${item.senderAccountId === account?.id ? 'justify-end' : 'justify-start'}`}>
           <div className={`rounded-2xl px-3 py-2 max-w-[85%] ${item.senderAccountId === account?.id ? 'bg-blue-600' : 'bg-slate-700'}`}>
-            <p className="text-xs opacity-75">{item.senderAccountId === account?.id ? 'You' : account?.role === 'TUTOR' ? active?.studentName : 'Tutor'}</p>
+            <p className="text-xs opacity-75">{item.senderAccountId === account?.id ? 'You' : account?.role === 'TUTOR' ? active?.studentName : active?.teacherName || 'Teacher'}</p>
             <p className="text-sm whitespace-pre-wrap break-words">{item.body}</p>
             <p className="text-[11px] opacity-75 mt-1">{new Date(item.createdAt).toLocaleString()} {item.senderAccountId === account?.id && (item.readAt ? '· Read' : '· Sent')}</p>
           </div>

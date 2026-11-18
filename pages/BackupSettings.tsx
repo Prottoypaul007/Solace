@@ -116,6 +116,7 @@ export const BackupSettings: React.FC = () => {
           <h2 className="font-semibold">Account and student access</h2>
           <button className="block text-blue-300 text-sm" onClick={() => navigate('/account')}>My account and password</button>
           <button className="block text-blue-300 text-sm" onClick={() => navigate('/student-accounts')}>Manage student accounts</button>
+          <button className="block text-blue-300 text-sm" onClick={() => navigate('/invite-teacher')}>Invite another teacher</button>
           {hasPendingChanges() && <button className="block text-amber-300 text-sm" onClick={() => void retrySync().then(() => setNotice('Changes saved to the server.')).catch(e => setError(e.message))}>Retry saving device changes</button>}
         </section>
         <section className="rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">

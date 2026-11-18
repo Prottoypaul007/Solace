@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { backupCounts, AppBackup, missingStudentReferences } from '../services/backup';
 import { saveBackupFile } from '../services/backupShare';
 import { DataConflictError, loadTutorData, recordChanged, retrySync, useDeviceRecords, useServerRecords } from '../services/sync';
+import { useAuth } from './AuthProvider';
 
 const countSummary = (backup: AppBackup) => backupCounts(backup).map(({ collection, count }) => `${collection}: ${count}`).join(' · ');
 
 export const TutorDataGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { account } = useAuth();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState<DataConflictError | null>(null);
@@ -16,7 +18,7 @@ export const TutorDataGate: React.FC<{ children: React.ReactNode }> = ({ childre
   const [busy, setBusy] = useState(false);
   const load = () => {
     setError(''); setConflict(null);
-    void loadTutorData().then(() => setReady(true)).catch(cause => {
+    void loadTutorData(account?.id).then(() => setReady(true)).catch(cause => {
       if (cause instanceof DataConflictError) setConflict(cause);
       else setError(cause instanceof Error ? cause.message : 'Could not load tutor records.');
     });
@@ -41,14 +43,14 @@ export const TutorDataGate: React.FC<{ children: React.ReactNode }> = ({ childre
   const migrate = async () => {
     if (!conflict || !savedCopy || !replaceConfirmed) return;
     setBusy(true); setError('');
-    try { await useDeviceRecords(conflict.device); setConflict(null); setReady(true); }
+    try { await useDeviceRecords(conflict.device, account?.id); setConflict(null); setReady(true); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not copy device records.'); }
     finally { setBusy(false); }
   };
   const loadServer = () => {
     if (!conflict || !savedCopy || !loadServerConfirmed) return;
     setError('');
-    try { useServerRecords(conflict.server); setConflict(null); setReady(true); }
+    try { useServerRecords(conflict.server, account?.id); setConflict(null); setReady(true); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load server records.'); }
   };
   if (!ready) return <main className="min-h-screen bg-slate-950 text-white grid place-items-center p-5"><div className="w-full max-w-lg rounded-3xl bg-slate-900 border border-white/10 p-5 space-y-4">

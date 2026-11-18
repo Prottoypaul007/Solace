@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import { ScheduledClass, StudentChoice } from '../../services/communications';
 import { formatDhaka, fromDhakaInput, toDhakaInput } from '../../services/time';
 
-export const SchedulePanel: React.FC<{ revision: number; students: StudentChoice[] }> = ({ revision, students }) => {
+export const SchedulePanel: React.FC<{ revision: number; students: StudentChoice[]; teacherFilter?: string }> = ({ revision, students, teacherFilter = '' }) => {
   const { account } = useAuth();
   const tutor = account?.role === 'TUTOR';
   const [rows, setRows] = useState<ScheduledClass[]>([]);
@@ -32,8 +32,8 @@ export const SchedulePanel: React.FC<{ revision: number; students: StudentChoice
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not cancel class.'); }
   };
   return <div className="grid md:grid-cols-[1fr_18rem] gap-4"><div className="space-y-3"><h2 className="font-semibold">Upcoming classes</h2>
-    {!rows.filter(row => Date.parse(row.start_at) > Date.now()).length && <p className="text-sm text-slate-400">No upcoming classes scheduled.</p>}
-    {rows.filter(row => Date.parse(row.start_at) > Date.now()).map(row => <article key={row.id} className="rounded-2xl bg-slate-800/60 border border-white/10 p-4"><h3 className="font-semibold">{row.subject}</h3><p className="text-sm text-slate-300">{tutor && `${students.find(item => item.id === row.student_id)?.name || 'Student'} · `}{formatDhaka(row.start_at)} (Dhaka)</p><p className="text-xs text-slate-400">Reminder {row.reminder_minutes} minutes before</p>{tutor && <div className="space-x-3 mt-2"><button className="text-blue-300 text-sm" onClick={() => edit(row)}>Reschedule</button><button className="text-rose-300 text-sm" onClick={() => void cancel(row.id)}>Cancel</button></div>}</article>)}
+    {!rows.filter(row => (!teacherFilter || row.student_id === teacherFilter) && Date.parse(row.start_at) > Date.now()).length && <p className="text-sm text-slate-400">No upcoming classes scheduled.</p>}
+    {rows.filter(row => (!teacherFilter || row.student_id === teacherFilter) && Date.parse(row.start_at) > Date.now()).map(row => <article key={row.id} className="rounded-2xl bg-slate-800/60 border border-white/10 p-4"><h3 className="font-semibold">{row.subject}</h3><p className="text-sm text-slate-300">{tutor && `${students.find(item => item.id === row.student_id)?.name || 'Student'} · `}{formatDhaka(row.start_at)} (Dhaka){!tutor && row.teacherName && ` · ${row.teacherName}`}</p><p className="text-xs text-slate-400">Reminder {row.reminder_minutes} minutes before</p>{tutor && <div className="space-x-3 mt-2"><button className="text-blue-300 text-sm" onClick={() => edit(row)}>Reschedule</button><button className="text-rose-300 text-sm" onClick={() => void cancel(row.id)}>Cancel</button></div>}</article>)}
   </div>
   {tutor && <form onSubmit={save} className="rounded-2xl bg-slate-800/60 border border-white/10 p-4 space-y-3 h-fit"><h2 className="font-semibold">{editing ? 'Reschedule class' : 'Schedule class'}</h2>
     {!editing && <select className="w-full rounded-xl bg-slate-900 p-3 text-sm" required value={studentId} onChange={e => { setStudentId(e.target.value); setSubject(students.find(item => item.id === e.target.value)?.subject || ''); }}><option value="">Choose student</option>{students.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}

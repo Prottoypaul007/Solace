@@ -104,6 +104,56 @@ export const migrateAppTables = () => {
       PRIMARY KEY(scheduled_class_id,start_at,reminder_minutes)
     );
   `);
+  // Existing installations had one tutor. Assign their records before adding
+  // another tutor, keeping every student and record ID intact.
+  if (!db.prepare('PRAGMA table_info(students)').all().some(column => column.name === 'owner_tutor_id')) {
+    db.exec('ALTER TABLE students ADD COLUMN owner_tutor_id TEXT');
+  }
+  if (!db.prepare('PRAGMA table_info(announcement)').all().some(column => column.name === 'owner_tutor_id')) {
+    db.exec('ALTER TABLE announcement ADD COLUMN owner_tutor_id TEXT');
+  }
+  if (!db.prepare('PRAGMA table_info(homework)').all().some(column => column.name === 'owner_tutor_id')) {
+    db.exec('ALTER TABLE homework ADD COLUMN owner_tutor_id TEXT');
+  }
+  const firstTutor = db.prepare("SELECT id FROM access_account WHERE role='TUTOR' ORDER BY created_at,id LIMIT 1").get()?.id;
+  if (firstTutor) {
+    db.prepare('UPDATE students SET owner_tutor_id=? WHERE owner_tutor_id IS NULL').run(firstTutor);
+    db.prepare('UPDATE announcement SET owner_tutor_id=? WHERE owner_tutor_id IS NULL').run(firstTutor);
+    db.prepare('UPDATE homework SET owner_tutor_id=? WHERE owner_tutor_id IS NULL').run(firstTutor);
+  }
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS students_owner_idx ON students(owner_tutor_id);
+    CREATE TABLE IF NOT EXISTS student_enrollment (
+      student_id TEXT PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL REFERENCES access_account(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','DISABLED')),
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS enrollment_account_idx ON student_enrollment(account_id);
+    CREATE TABLE IF NOT EXISTS teacher_invitation (
+      id TEXT PRIMARY KEY,
+      inviter_account_id TEXT NOT NULL REFERENCES access_account(id),
+      email TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS student_link_invitation (
+      id TEXT PRIMARY KEY,
+      student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL REFERENCES access_account(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+  if (!db.prepare('PRAGMA table_info(student_enrollment)').all().some(column => column.name === 'status')) {
+    db.exec("ALTER TABLE student_enrollment ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'");
+  }
+  db.prepare(`INSERT OR IGNORE INTO student_enrollment(student_id,account_id,created_at)
+    SELECT student_id,id,created_at FROM access_account WHERE role='STUDENT' AND student_id IS NOT NULL`).run();
   if (!db.prepare('PRAGMA table_info(homework_attachment)').all().some(column => column.name === 'client_nonce')) {
     db.exec('ALTER TABLE homework_attachment ADD COLUMN client_nonce TEXT');
   }
@@ -121,5 +171,18 @@ export const recordsFor = (collection, studentId) => {
   const rows = studentId === undefined
     ? db.prepare(`SELECT payload FROM ${table}`).all()
     : db.prepare(`SELECT payload FROM ${table} WHERE student_id = ?`).all(studentId);
+  return rows.map(row => JSON.parse(row.payload));
+};
+
+export const ownedStudent = (tutorId, studentId) => Boolean(db.prepare('SELECT 1 FROM students WHERE id=? AND owner_tutor_id=?').get(studentId, tutorId));
+export const enrolledStudent = (accountId, studentId) => Boolean(db.prepare("SELECT 1 FROM student_enrollment WHERE student_id=? AND account_id=? AND status='ACTIVE'").get(studentId, accountId));
+export const studentIdsFor = accountId => db.prepare("SELECT student_id AS id FROM student_enrollment WHERE account_id=? AND status='ACTIVE'").all(accountId).map(row => row.id);
+export const tutorForStudent = studentId => db.prepare('SELECT owner_tutor_id AS id FROM students WHERE id=?').get(studentId)?.id;
+export const recordsForTutor = (collection, tutorId) => {
+  const table = tables[collection];
+  if (!table) throw new Error('Unknown collection');
+  const rows = collection === 'students'
+    ? db.prepare('SELECT payload FROM students WHERE owner_tutor_id=?').all(tutorId)
+    : db.prepare(`SELECT r.payload FROM ${table} r JOIN students s ON s.id=r.student_id WHERE s.owner_tutor_id=?`).all(tutorId);
   return rows.map(row => JSON.parse(row.payload));
 };

@@ -1,5 +1,13 @@
 # Solace
 
+## Version 2.0: multiple teachers
+
+One student can use one email and password with several teachers on the same Solace server. Each teacher owns a separate student profile, subject, rate, classes, payments, test results, and communication history. The student's dashboard combines their linked teachers and offers a teacher filter. Tutor exports and sync include only that tutor's records.
+
+To add a teacher, sign in as an existing tutor and open **Settings → Invite another teacher**. Copy the private link and send it to the new teacher. They choose a name and password, then sign in with their own email. The new teacher adds the student to their own list and opens **Student accounts → Enable student login**, using the student's existing Solace email. The student opens that invitation, signs in with their existing password, and accepts the link. Disabling access from one teacher leaves the student's other teacher links active.
+
+Before updating a server with existing records, save a verified JSON export and a server snapshot. The database migration assigns legacy records to the original tutor without changing record IDs. Install the new Android APK over the current app; do not uninstall it or clear app data. Teachers sharing a phone should sign out before switching accounts. If device records belong to another teacher, Solace shows a backup and conflict choice instead of importing them automatically.
+
 ## Version 1.3 additions
 
 - Tutor and student accounts with invitation activation, server-side permissions, and an import path for existing device records.
@@ -15,7 +23,7 @@
 
 Before installing an APK over an existing phone installation, follow [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
-Solace is a mobile-first tutoring tracker for an individual tutor. It keeps student profiles, class sessions, payments, test results, parent contacts, and a history of test-result messages in one place. The app runs in a browser and can be packaged as an Android app with Capacitor.
+Solace is a mobile-first tutoring tracker for teachers and students. It keeps student profiles, class sessions, payments, test results, parent contacts, and a history of test-result messages in one place. The app runs in a browser and can be packaged as an Android app with Capacitor.
 
 ## What it does
 

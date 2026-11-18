@@ -18,6 +18,8 @@ import { AccountSettings } from './pages/AccountSettings';
 import { StudentAccounts } from './pages/StudentAccounts';
 import { TutorDataGate } from './components/TutorDataGate';
 import { Connect } from './pages/Connect';
+import { TeacherInvites } from './pages/TeacherInvites';
+import { ActivateTeacher } from './pages/ActivateTeacher';
 
 const ConnectRoute: React.FC = () => {
   const { account } = useAuth();
@@ -32,6 +34,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/activate" element={<Activate />} />
+        <Route path="/activate-teacher" element={<ActivateTeacher />} />
         <Route path="/student-home" element={<Protected role="STUDENT"><StudentHome /></Protected>} />
         <Route path="/connect" element={<Authenticated><ConnectRoute /></Authenticated>} />
         <Route path="/student-account" element={<Protected role="STUDENT"><AccountSettings /></Protected>} />
@@ -47,6 +50,7 @@ const App: React.FC = () => {
           <Route path="/settings" element={<BackupSettings />} />
           <Route path="/student/:id/statement" element={<MonthlyStatement />} />
           <Route path="/student-accounts" element={<StudentAccounts />} />
+          <Route path="/invite-teacher" element={<TeacherInvites />} />
         </Route>
       </Routes>
       </AuthProvider>
