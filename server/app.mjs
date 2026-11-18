@@ -15,6 +15,9 @@ const app = express();
 const allowed = new Set([new URL(baseURL).origin, ...origins]);
 app.disable('x-powered-by');
 app.use((req, res, next) => {
+  // Browser module and stylesheet requests may carry an Origin header too.
+  // Restrict API origins without blocking public files served from dist/.
+  if (!req.path.startsWith('/api/')) return next();
   const origin = req.headers.origin;
   if (origin && !allowed.has(origin)) return res.status(403).json({ error: 'Origin not allowed.' });
   if (origin) {
