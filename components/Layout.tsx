@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Home, MessageCircle, Settings, Users } from 'lucide-react';
+import { backFallback } from './backNavigation';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,9 +12,20 @@ interface LayoutProps {
   wide?: boolean;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, title, showBack = false, onBack, studentMode = false, wide = false }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onBack, studentMode = false, wide = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const isHome = location.pathname === '/' || location.pathname === '/student-home';
+  const hasHistory = typeof window.history.state?.idx === 'number' && window.history.state.idx > 0;
+  const canGoBack = showBack ?? (!isHome || hasHistory);
+  const goBack = () => {
+    if (onBack) { onBack(); return; }
+    if (hasHistory) {
+      navigate(-1);
+    } else {
+      navigate(backFallback(location.pathname, studentMode), { replace: true });
+    }
+  };
   const items = studentMode
     ? [
         { label: 'Home', path: '/student-home', icon: Home, active: location.pathname === '/student-home' },
@@ -30,7 +42,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack = fals
   return <div className="min-h-screen bg-slate-950 text-slate-50">
     <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/95 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl">
       <div className={`mx-auto flex items-center gap-3 ${wide ? 'max-w-5xl' : 'max-w-xl'}`}>
-        {showBack ? <button type="button" aria-label="Go back" onClick={() => onBack ? onBack() : navigate(-1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-800 text-slate-100 active:bg-slate-700"><ArrowLeft size={20} /></button>
+        {canGoBack ? <button type="button" aria-label="Go back" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-800 text-slate-100 active:bg-slate-700"><ArrowLeft size={20} /></button>
           : <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-500 text-lg font-bold text-white shadow-lg shadow-blue-500/20">S</div>}
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">Solace</p>

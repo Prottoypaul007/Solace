@@ -57,7 +57,7 @@ export const AddStudent: React.FC = () => {
   };
 
   return (
-    <Layout title="Add student" showBack onBack={() => navigate(-1)}>
+    <Layout title="Add student" showBack>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-4 shadow-md shadow-black/40">
           <Input
