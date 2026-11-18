@@ -1,11 +1,25 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { openSnapshotStore } from './snapshot-store.mjs';
 
-export const databasePath = resolve(process.env.SOLACE_DATABASE_PATH || 'server/data/solace.sqlite');
-mkdirSync(dirname(databasePath), { recursive: true });
+const remoteUrl = process.env.DATABASE_URL;
+if (process.env.RENDER === 'true' && !remoteUrl) {
+  throw new Error('DATABASE_URL is required on Render. Refusing to use temporary SQLite storage.');
+}
+export const databasePath = remoteUrl ? ':memory:' : resolve(process.env.SOLACE_DATABASE_PATH || 'server/data/solace.sqlite');
+if (!remoteUrl) mkdirSync(dirname(databasePath), { recursive: true });
 export const db = new DatabaseSync(databasePath);
-db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+const snapshotStore = remoteUrl
+  ? await openSnapshotStore(remoteUrl, { requireExisting: process.env.RENDER === 'true' || process.env.SOLACE_REQUIRE_SNAPSHOT === '1' })
+  : null;
+if (snapshotStore) {
+  await snapshotStore.load(db);
+  console.log(`Neon snapshot loaded at revision ${snapshotStore.revision}.`);
+}
+db.exec(remoteUrl ? 'PRAGMA foreign_keys = ON;' : 'PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+export const saveDatabase = options => snapshotStore?.saveIfChanged(db, options) ?? Promise.resolve();
+export const usesRemoteSnapshot = Boolean(snapshotStore);
 
 export const migrateAppTables = () => {
   db.exec(`

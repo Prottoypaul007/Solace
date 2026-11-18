@@ -3,13 +3,15 @@ import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { toNodeHandler, fromNodeHeaders } from 'better-auth/node';
 import { auth, internalAuth, origins, baseURL } from './auth.mjs';
-import { db, migrateAppTables, recordsFor, tables } from './db.mjs';
+import { db, migrateAppTables, recordsFor, saveDatabase, tables, usesRemoteSnapshot } from './db.mjs';
 import { getMigrations } from 'better-auth/db/migration';
 import { parseBackup } from '../services/backup.ts';
 import { installCommunications, disconnectAccount } from './communications.mjs';
+import { persistBeforeResponse } from './persist-response.mjs';
 
 await (await getMigrations(auth.options)).runMigrations();
 migrateAppTables();
+await saveDatabase({ force: true });
 
 const app = express();
 const allowed = new Set([new URL(baseURL).origin, ...origins]);
@@ -30,6 +32,7 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+if (usesRemoteSnapshot) app.use(persistBeforeResponse(saveDatabase));
 const authHandler = toNodeHandler(auth);
 app.all('/api/auth/*splat', (req, res) => {
   // Replace any client-supplied value before Better Auth applies per-IP limits.

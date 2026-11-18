@@ -63,13 +63,14 @@ npm run build
 npm run preview
 ```
 
-The build runs TypeScript checking and writes the web assets to `dist/`. The server requires Node.js 24 and a private `BETTER_AUTH_SECRET` of at least 32 characters. `SOLACE_DATABASE_PATH` points to the SQLite file. Keep the `.env` file private and back up the database file regularly.
+The build runs TypeScript checking and writes the web assets to `dist/`. The server requires Node.js 24 and a private `BETTER_AUTH_SECRET` of at least 32 characters. Without `DATABASE_URL`, `SOLACE_DATABASE_PATH` points to a local SQLite file. Keep `.env` private and back up the database regularly.
 
 | Variable | Purpose |
 | --- | --- |
 | `BETTER_AUTH_SECRET` | Private session and token signing secret, 32 characters or longer |
 | `BETTER_AUTH_URL` | Public HTTPS origin of the API server |
 | `SOLACE_DATABASE_PATH` | Persistent SQLite database file |
+| `DATABASE_URL` | Neon PostgreSQL connection string. When set, the SQLite working database is held in memory and saved as versioned snapshots in Neon. |
 | `SOLACE_ALLOWED_ORIGINS` | Comma-separated exact web and Android origins; include `https://localhost` for the Android WebView |
 | `SOLACE_APP_URL` | Web app origin used in student invitation links |
 | `VITE_API_URL` | API origin compiled into the web and Android app |
@@ -80,7 +81,19 @@ Better Auth owns password hashes and session cookies. The local SQLite database 
 
 For one-address hosting, build the web app with `VITE_API_URL` set to the server's HTTPS origin, then run `npm run server`. The server serves `dist/` at `/` and the API at `/api`. Set `BETTER_AUTH_URL` and `SOLACE_APP_URL` to that same HTTPS origin, and set `SOLACE_ALLOWED_ORIGINS` to that origin plus `https://localhost` for the Android app. Use a TLS reverse proxy in front of port 3005 and keep `SOLACE_DATABASE_PATH` on persistent storage. The server must stay running for messages and reminder checks.
 
-For a managed host such as Render, use one always-on Node.js web service with a persistent disk. Set its build command to `npm ci && npm run build`, start command to `npm run server`, `NODE_VERSION` to a Node.js 24 release, and `SOLACE_DATABASE_PATH` to a file on the mounted disk (for example `/var/data/solace.sqlite`). Set the three URL variables to the service's HTTPS origin. Set `SOLACE_ALLOWED_ORIGINS` to that origin and `https://localhost`. After deployment, run `npm run setup:tutor` once in the service shell with the setup email and password configured, then remove the setup password. Do not use an ephemeral filesystem for the SQLite file.
+### Free Render service with Neon storage
+
+The existing API keeps its SQLite query engine. With `DATABASE_URL` set, it restores the SQLite database from a checksum-checked snapshot in Neon at startup. After a request changes the database, the HTTP response waits until a new snapshot is saved in Neon. A revision check stops an older Render instance from overwriting newer data. This is intended for a small, single-instance academic app; each write transfers the complete database snapshot. Keep separate JSON and server backups.
+
+1. Create a free Neon PostgreSQL project. Copy its **pooled** connection string privately; never commit or send it in chat. Do not import phone records into the current Render SQLite database.
+2. On your PC, put `DATABASE_URL` in the ignored `Mobileapp/.env`. Set `BETTER_AUTH_URL`, `SOLACE_APP_URL`, and `VITE_API_URL` to the exact Render HTTPS origin, and `SOLACE_ALLOWED_ORIGINS` to that origin plus `https://localhost`. Use the same `BETTER_AUTH_SECRET` value that Render uses. Set `SOLACE_SETUP_EMAIL` and a **new** `SOLACE_SETUP_PASSWORD` of at least 12 characters.
+3. Run `npm ci` and `npm run setup:tutor` on your PC while connected to the internet. This creates the first tutor account and initial Neon snapshot. Remove `SOLACE_SETUP_PASSWORD` from `.env` afterward. This one-time command must run before deploying the Neon version to Render Free because the free service has no Shell.
+4. In Render's **Environment**, set `DATABASE_URL` to the same Neon URL. Keep the existing auth secret and set all URL/origin variables to the Render URL. Build with `npm ci && npm run build`, start with `npm run server`, and use Node 24. Render refuses to start without `DATABASE_URL` or an existing snapshot, so it cannot silently fall back to temporary local storage. Save, rebuild, and deploy. The startup log should say `Neon snapshot loaded at revision ...`.
+5. Sign in on the Render website and verify an empty tutor account before updating the phone. After the phone's JSON backup is safely saved outside the app, install the signed update over the old app and verify the imported record counts. Run `npm run backup:server` on the PC periodically to download a verified full server snapshot to the ignored `backups/` folder.
+
+Render Free sleeps while idle. Messages become available when the service wakes, but the in-process class reminder timer does not run while it sleeps. Reminders may not appear at their scheduled time. Do not present this as an always-on reminder service.
+
+For paid hosting with a persistent disk, the local SQLite mode remains available; set `SOLACE_DATABASE_PATH` to a file on the disk and leave `DATABASE_URL` unset.
 
 ## Run on Android
 

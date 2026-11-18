@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { db, migrateAppTables } from './db.mjs';
+import { db, migrateAppTables, saveDatabase } from './db.mjs';
 import { internalAuth, auth, baseURL } from './auth.mjs';
 import { getMigrations } from 'better-auth/db/migration';
 
@@ -26,4 +26,5 @@ const now = new Date().toISOString();
 db.prepare(`INSERT INTO access_account (id, user_id, student_id, email, role, status, created_at, updated_at)
   VALUES (?, ?, NULL, ?, 'TUTOR', 'ACTIVE', ?, ?)`).run(randomUUID(), created.user.id, email, now, now);
 db.prepare('DELETE FROM session WHERE userId = ?').run(created.user.id);
+await saveDatabase({ force: true });
 console.log(`Initial tutor account created for ${email}. Remove SOLACE_SETUP_PASSWORD from .env or the shell now.`);
