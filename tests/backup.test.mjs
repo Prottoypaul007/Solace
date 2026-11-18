@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createBackup, parseBackup, restoreBackup, sameBackupData } from '../services/backup.ts';
+import { createBackup, missingStudentReferences, parseBackup, recoverMissingStudents, restoreBackup, sameBackupData } from '../services/backup.ts';
 
 const values = new Map();
 globalThis.localStorage = {
@@ -57,4 +57,19 @@ test('detects different device and server records before migration', () => {
   assert.equal(sameBackupData(phone, same), true);
   const server = parseBackup(JSON.stringify({ ...phone, data: { ...phone.data, students: [] } }));
   assert.equal(sameBackupData(phone, server), false);
+});
+
+test('recovers missing student references without changing linked records', () => {
+  const original = createBackup();
+  const result = { id: 'test-1', studentId: 'missing-1', testName: 'Quiz', subject: 'Math', date: '2026-01-02', maxMarks: 10, obtainedMarks: 8, percentage: 80, sentToParent: false };
+  original.data.testResults = [result];
+  const missing = missingStudentReferences(original);
+  assert.deepEqual(missing, [{ studentId: 'missing-1', counts: { testResults: 1 } }]);
+  const repaired = recoverMissingStudents(original);
+  assert.equal(repaired.data.students.length, original.data.students.length + 1);
+  assert.equal(repaired.data.students.at(-1).id, 'missing-1');
+  assert.equal(repaired.data.students.at(-1).ratePerClass, 0);
+  assert.deepEqual(repaired.data.testResults, [result]);
+  assert.equal(original.data.students.some(item => item.id === 'missing-1'), false);
+  assert.equal(recoverMissingStudents(repaired), repaired);
 });

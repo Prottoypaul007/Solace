@@ -2,10 +2,10 @@ import React, { useRef, useState } from 'react';
 import { Download, FileUp, ShieldCheck } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { Button } from '../components/Button';
-import { AppBackup, backupCounts, createBackup, parseBackup, restoreBackup } from '../services/backup';
+import { AppBackup, backupCounts, createBackup, missingStudentReferences, parseBackup, restoreBackup } from '../services/backup';
 import { saveBackupFile } from '../services/backupShare';
 import { useNavigate } from 'react-router-dom';
-import { hasPendingChanges, recordChanged, retrySync } from '../services/sync';
+import { hasPendingChanges, recordChanged, repairImportedRecords, retrySync } from '../services/sync';
 
 const labels: Record<string, string> = {
   students: 'Students',
@@ -24,6 +24,17 @@ export const BackupSettings: React.FC = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const missing = missingStudentReferences(createBackup());
+
+  const repair = async () => {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const count = await repairImportedRecords();
+      setNotice(`${count} missing student record${count === 1 ? '' : 's'} restored. Open Students to update each recovered student's name and class rate.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save repaired records. The records remain on this device.');
+    } finally { setBusy(false); }
+  };
 
   const exportData = async () => {
     setError('');
@@ -74,6 +85,14 @@ export const BackupSettings: React.FC = () => {
   return (
     <Layout title="Backup & Restore">
       <div className="space-y-5 pb-4">
+        {missing.length > 0 && <section className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 space-y-3">
+          <h2 className="text-lg font-semibold text-amber-100">Repair imported records</h2>
+          <p className="text-sm text-amber-100/90">Some imported records refer to students missing from the student list. This prevents new changes from saving to the server. Repair adds a clearly marked student for each missing ID and keeps every linked record.</p>
+          {missing.map(({ studentId, counts }) => <p key={studentId} className="break-all rounded-xl bg-slate-900/70 p-3 text-xs text-slate-200">ID {studentId} · {Object.entries(counts).map(([collection, count]) => `${count} ${labels[collection] || collection}`).join(', ')}</p>)}
+          <p className="text-xs text-amber-100/80">Save a backup first if you want a copy of the imported data before repair. Review recovered names and rates afterward.</p>
+          <Button variant="secondary" fullWidth onClick={exportData}>Save backup</Button>
+          <Button fullWidth disabled={busy} onClick={() => void repair()}>{busy ? 'Repairing…' : 'Restore missing students and retry save'}</Button>
+        </section>}
         <section className="rounded-2xl border border-white/10 bg-slate-800/60 p-4 space-y-3">
           <h2 className="font-semibold">Account and student access</h2>
           <button className="block text-blue-300 text-sm" onClick={() => navigate('/account')}>My account and password</button>

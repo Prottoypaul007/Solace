@@ -9,7 +9,8 @@ export const updateStudent = (student: Student): void => {
   const previous = students.find(item => item.id === student.id);
   if (!previous) throw new Error('Student not found.');
   const updatedStudents = students.map(item => item.id === student.id ? student : item);
-  if (previous.ratePerClass !== student.ratePerClass) {
+  const recoveredPlaceholder = previous.ratePerClass === 0 && previous.name.startsWith('Recovered student ') && previous.subject === 'Review imported record';
+  if (previous.ratePerClass !== student.ratePerClass && !recoveredPlaceholder) {
     const updatedClasses = getClasses().map(item => item.studentId === student.id && item.rateCharged === undefined
       ? { ...item, rateCharged: previous.ratePerClass } : item);
     writeBatch({ [DATA_KEYS.students]: updatedStudents, [DATA_KEYS.classes]: updatedClasses });

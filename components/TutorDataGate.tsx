@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { backupCounts, AppBackup } from '../services/backup';
+import { backupCounts, AppBackup, missingStudentReferences } from '../services/backup';
 import { saveBackupFile } from '../services/backupShare';
 import { DataConflictError, loadTutorData, recordChanged, retrySync, useDeviceRecords, useServerRecords } from '../services/sync';
 
@@ -55,6 +55,7 @@ export const TutorDataGate: React.FC<{ children: React.ReactNode }> = ({ childre
     {conflict ? <>
       <h1 className="text-xl font-semibold">Choose which records to keep</h1>
       <p className="text-sm text-amber-200">This device has different records from the server. Nothing has been replaced.</p>
+      {missingStudentReferences(conflict.device).length > 0 && <p className="text-sm text-amber-100">Some device records point to missing students. If you choose this device's records, Solace will add recovered student entries to preserve those records. Review their names and rates afterward.</p>}
       <div className="rounded-xl bg-slate-800 p-3"><h2 className="font-semibold">This device</h2><p className="text-sm text-slate-300 mt-1">{countSummary(conflict.device)}</p><button className="text-blue-300 text-sm mt-2" onClick={() => void save(conflict.device, 'device')}>Save device backup</button></div>
       <div className="rounded-xl bg-slate-800 p-3"><h2 className="font-semibold">Server</h2><p className="text-sm text-slate-300 mt-1">{countSummary(conflict.server)}</p><button className="text-blue-300 text-sm mt-2" onClick={() => void save(conflict.server, 'server')}>Save server backup</button></div>
       <p className="text-sm text-slate-300">Copying this device's records will replace the six record collections on the server. Any server-only records in those collections will be lost.</p>

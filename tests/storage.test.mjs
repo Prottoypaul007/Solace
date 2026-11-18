@@ -41,3 +41,12 @@ test('the student whose class was just logged moves to the top even for an older
   storage.deleteClassSession('new');
   assert.equal(storage.sortStudentsByRecentClass(storage.getStudents(), storage.getClasses())[0].id, 'a');
 });
+
+test('editing a recovered student rate restores the value of imported classes', () => {
+  values.clear();
+  const student = { id: 'missing-1', name: 'Recovered student missing-', subject: 'Review imported record', phone: '', createdAt: '2026-01-01', ratePerClass: 0 };
+  storage.addStudent(student);
+  storage.addClassSession({ id: 'class-1', studentId: student.id, date: '2026-01-02', durationMinutes: 60 });
+  storage.updateStudent({ ...student, name: 'Actual student', subject: 'Math', ratePerClass: 500 });
+  assert.equal(storage.getStudentBalance(student.id), 500);
+});

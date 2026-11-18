@@ -52,6 +52,10 @@ test('tutor setup, sessions, invitations, student isolation and revocation', asy
       ], classes: [{ id: 'class-a', studentId: 'a', date: now, durationMinutes: 60 }],
       payments: [], testResults: [], parentContacts: [], communications: [],
     } };
+    const orphanedImport = structuredClone(backup);
+    orphanedImport.data.testResults.push({ id: 'orphan-test', studentId: 'missing', testName: 'Quiz', subject: 'Math', date: now, maxMarks: 10, obtainedMarks: 8, percentage: 80, sentToParent: false });
+    assert.equal((await request('/api/tutor/import', { method: 'POST', body: orphanedImport, cookie: tutor.cookie })).status, 400);
+    assert.equal(db.prepare('SELECT COUNT(*) AS total FROM students').get().total, 0);
     assert.equal((await request('/api/tutor/import', { method: 'POST', body: backup, cookie: tutor.cookie })).status, 200);
     assert.equal((await request('/api/tutor/import', { method: 'POST', body: backup, cookie: tutor.cookie })).status, 409);
     assert.equal((await request('/api/tutor/data', { method: 'PUT', body: backup, cookie: tutor.cookie })).status, 200);

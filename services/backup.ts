@@ -120,6 +120,42 @@ export const restoreBackup = (backup: AppBackup): void => {
 export const backupCounts = (backup: AppBackup) =>
   collections.map(collection => ({ collection, count: backup.data[collection].length }));
 
+export const missingStudentReferences = (backup: AppBackup) => {
+  const known = new Set(backup.data.students.map(student => student.id));
+  const missing = new Map<string, Record<string, number>>();
+  for (const collection of collections) {
+    if (collection === 'students') continue;
+    for (const record of backup.data[collection]) {
+      const studentId = record.studentId;
+      if (typeof studentId !== 'string' || known.has(studentId)) continue;
+      const counts = missing.get(studentId) ?? {};
+      counts[collection] = (counts[collection] || 0) + 1;
+      missing.set(studentId, counts);
+    }
+  }
+  return [...missing].map(([studentId, counts]) => ({ studentId, counts }));
+};
+
+export const recoverMissingStudents = (backup: AppBackup): AppBackup => {
+  const missing = missingStudentReferences(backup);
+  if (missing.length === 0) return backup;
+  const createdAt = new Date().toISOString();
+  return {
+    ...backup,
+    data: {
+      ...backup.data,
+      students: [...backup.data.students, ...missing.map(({ studentId }) => ({
+        id: studentId,
+        name: `Recovered student ${studentId.slice(0, 8)}`,
+        subject: 'Review imported record',
+        ratePerClass: 0,
+        phone: '',
+        createdAt,
+      }))],
+    },
+  };
+};
+
 export const sameBackupData = (left: AppBackup, right: AppBackup): boolean =>
   collections.every(collection => {
     const a = left.data[collection], b = right.data[collection];

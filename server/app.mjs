@@ -72,6 +72,13 @@ app.get('/api/me', async (req, res, next) => {
 app.post('/api/tutor/import', tutor, (req, res, next) => {
   try {
     const backup = parseBackup(JSON.stringify(req.body));
+    const studentIds = new Set(backup.data.students.map(item => item.id));
+    for (const [collection, records] of Object.entries(backup.data)) {
+      if (new Set(records.map(item => item.id)).size !== records.length) return res.status(400).json({ error: `Duplicate ${collection} IDs.` });
+      if (collection !== 'students' && records.some(item => !studentIds.has(item.studentId))) {
+        return res.status(400).json({ error: `${collection} contains a missing student reference.` });
+      }
+    }
     if (Object.values(tables).some(table => db.prepare(`SELECT 1 FROM ${table} LIMIT 1`).get())) {
       return res.status(409).json({ error: 'Records already exist. Import is only allowed into an empty database.' });
     }

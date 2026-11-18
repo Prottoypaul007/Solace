@@ -1,5 +1,5 @@
 import { api, post } from './api';
-import { AppBackup, createBackup, restoreBackup, sameBackupData } from './backup';
+import { AppBackup, createBackup, missingStudentReferences, recoverMissingStudents, restoreBackup, sameBackupData } from './backup';
 const recordKeys = ['tt_students', 'tt_classes', 'tt_payments', 'test_results', 'parent_contacts', 'communications'];
 
 const pendingKey = 'solace_pending_sync';
@@ -22,7 +22,9 @@ export async function loadTutorData(): Promise<void> {
   const local = createBackup();
   if (counts(remote) === 0) {
     if (counts(local) > 0) {
-      await post('/api/tutor/import', local);
+      const recovered = recoverMissingStudents(local);
+      await post('/api/tutor/import', recovered);
+      if (recovered !== local) restoreBackup(recovered);
       report('Existing device records imported to your tutor account.');
     }
   } else if (counts(local) > 0 && !sameBackupData(local, remote)) {
@@ -35,10 +37,26 @@ export async function loadTutorData(): Promise<void> {
 }
 
 export async function useDeviceRecords(backup: AppBackup): Promise<void> {
-  await api('/api/tutor/data', { method: 'PUT', body: JSON.stringify(backup) });
+  const recovered = recoverMissingStudents(backup);
+  await api('/api/tutor/data', { method: 'PUT', body: JSON.stringify(recovered) });
+  if (recovered !== backup) restoreBackup(recovered);
   localStorage.removeItem(pendingKey);
   enabled = true;
   report('Device records copied to the server. Verify all counts before inviting students.');
+}
+
+export async function repairImportedRecords(): Promise<number> {
+  const current = createBackup();
+  const missing = missingStudentReferences(current);
+  if (missing.length === 0) return 0;
+  const repaired = recoverMissingStudents(current);
+  restoreBackup(repaired);
+  generation += 1;
+  localStorage.setItem(pendingKey, '1');
+  if (running) await running.catch(() => {});
+  await flushPending();
+  report(`${missing.length} missing student record${missing.length === 1 ? '' : 's'} restored. Review their names and rates.`);
+  return missing.length;
 }
 
 export function useServerRecords(backup: AppBackup): void {

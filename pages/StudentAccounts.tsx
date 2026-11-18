@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Student } from '../types';
 import { api, post } from '../services/api';
@@ -8,6 +9,7 @@ import { retrySync } from '../services/sync';
 interface LinkedAccount { id: string; studentId: string; email: string; status: 'PENDING' | 'ACTIVE' | 'DISABLED'; studentName: string }
 interface TutorData { data: { students: Student[] } }
 export const StudentAccounts: React.FC = () => {
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const focusedStudent = params.get('student');
   const [students, setStudents] = useState<Student[]>([]);
@@ -49,6 +51,6 @@ export const StudentAccounts: React.FC = () => {
       {account && account.status !== 'PENDING' && <div className="space-y-2"><input className="w-full bg-slate-900 rounded-xl p-3 text-sm" type="email" aria-label={`Email for ${student.name}`} value={emails[student.id] ?? account.email} onChange={e => setEmails(prev => ({ ...prev, [student.id]: e.target.value }))} /><button disabled={busy || (emails[student.id] ?? account.email) === account.email} className="text-blue-300 text-sm disabled:opacity-40" onClick={() => run(async () => { await api(`/api/tutor/accounts/${encodeURIComponent(account.id)}`, { method: 'PATCH', body: JSON.stringify({ email: emails[student.id] }) }); setNotice('Email updated. Existing sessions were revoked.'); })}>Update email</button></div>}
       {links[student.id] && <div className="space-y-2"><input readOnly aria-label="Activation link" className="w-full bg-slate-900 rounded-xl p-2 text-xs" value={links[student.id]} /><button className="text-blue-300 text-sm" onClick={() => void navigator.clipboard.writeText(links[student.id]).then(() => setNotice('Link copied.'))}>Copy link</button></div>}
     </section>; })}
-    {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}{notice && <p role="status" className="text-sm text-emerald-300">{notice}</p>}
+    {error && <div role="alert" className="space-y-2"><p className="text-sm text-rose-300">{error}</p>{error.includes('missing student reference') && <button className="min-h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold" onClick={() => navigate('/settings')}>Repair imported records in Settings</button>}</div>}{notice && <p role="status" className="text-sm text-emerald-300">{notice}</p>}
   </div></Layout>;
 };
